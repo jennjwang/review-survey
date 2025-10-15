@@ -32,6 +32,7 @@ def navigation_buttons(
     back_key="back", 
     next_key="next",
     next_label="Next",
+    show_back=True,
     validation_fn=None,
     validation_error="Please fill out all fields before proceeding."
 ):
@@ -44,18 +45,27 @@ def navigation_buttons(
         back_key: Unique key for back button
         next_key: Unique key for next button
         next_label: Label for next button (default: "Next")
+        show_back: Whether to render the back button (default: True)
         validation_fn: Function that returns True if validation passes
         validation_error: Error message to show if validation fails
     """
     st.markdown("<div style='margin-top: 2rem;'></div>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 4, 1])
     
+    back_clicked = False
+    next_clicked = False
     with col1:
-        back_clicked = st.button("Back", key=back_key)
+        if show_back:
+            back_clicked = st.button("Back", key=back_key)
+        else:
+            next_clicked = st.button(next_label, key=next_key)
     with col3:
-        next_clicked = st.button(next_label, key=next_key)
+        if show_back:
+            next_clicked = st.button(next_label, key=next_key)
+        else:
+            st.markdown("", unsafe_allow_html=True)
     
-    if back_clicked and on_back:
+    if show_back and back_clicked and on_back:
         on_back()
     elif next_clicked and on_next:
         if validation_fn is None or validation_fn():

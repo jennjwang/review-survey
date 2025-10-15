@@ -85,6 +85,7 @@ def participant_id_page():
         on_next=lambda: save_and_navigate('next', participant_id=participant_id),
         back_key="participant_id_back",
         next_key="participant_id_next",
+        show_back=False,
         validation_fn=validate,
         validation_error="Please enter a valid participant ID before proceeding."
     )
