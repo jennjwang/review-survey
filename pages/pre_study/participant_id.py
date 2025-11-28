@@ -1,51 +1,48 @@
 """
-Participant ID page for the reviewer survey.
+Review email page for the reviewer survey.
 """
 
 import streamlit as st
 from survey_components import page_header, text_input_question, navigation_buttons
 from survey_utils import save_and_navigate
-from survey_data import validate_participant_id, get_repository_assignment, load_session_state
+from survey_data import validate_participant_id, get_repository_assignment, determine_current_page
 
 
 def participant_id_page():
-    """Display the participant ID page."""
+    """Display the email page."""
     page_header(
-        "Participant Information",
-        "Please enter your participant ID to begin the survey."
+        "Reviewer Information"
     )
     
     # Load previous response if exists
     previous_participant_id = st.session_state['survey_responses'].get('participant_id', '')
     
-    # Participant ID input
+    # email input
     participant_id = text_input_question(
-        "Please enter your Participant ID:",
+        "Please enter your email to begin the survey:",
         "participant_id",
         previous_participant_id,
-        placeholder="Enter your participant ID"
+        placeholder="Enter your email"
     )
     
-    # Show repository assignment if participant ID is valid
+    # Show repository assignment if email is valid
     assigned_repo = None
     if participant_id and participant_id.strip():
         try:
-            # Validate participant ID
+            # Validate email
             validation_result = validate_participant_id(participant_id)
             
             if validation_result['valid']:
-                st.success(f"Participant ID '{participant_id}' validated successfully!")
+                # st.success(f"email '{participant_id}' validated successfully!")
                 # Persist participant_id immediately so downstream pages can use it
                 st.session_state['survey_responses']['participant_id'] = participant_id
-                
-                # Load existing session if available
-                session_result = load_session_state(participant_id)
-                if session_result['success'] and session_result['current_page'] > 0:
-                    st.session_state['page'] = session_result['current_page']
-                    st.session_state['survey_responses'].update(session_result['survey_responses'])
-                    st.info(f"🔄 Resumed session from page {session_result['current_page']}")
+
+                # Determine the correct page based on completion status
+                correct_page = determine_current_page(participant_id, st.session_state['survey_responses'])
+                if correct_page > 0:
+                    st.session_state['page'] = correct_page
                     st.rerun()
-                
+
                 # Get repository assignment
                 repo_result = get_repository_assignment(participant_id)
                 
@@ -68,7 +65,7 @@ def participant_id_page():
                 st.session_state['survey_responses'].pop('assigned_repository', None)
                 st.session_state['survey_responses'].pop('repository_url', None)
         except Exception as e:
-            st.error(f"Error validating participant ID: {str(e)}")
+            st.error(f"Error validating email: {str(e)}")
             assigned_repo = None
             # Clear any stale assignment from session state
             st.session_state['survey_responses'].pop('assigned_repository', None)
@@ -87,5 +84,5 @@ def participant_id_page():
         next_key="participant_id_next",
         show_back=False,
         validation_fn=validate,
-        validation_error="Please enter a valid participant ID before proceeding."
+        validation_error="Please enter a valid email before proceeding."
     )

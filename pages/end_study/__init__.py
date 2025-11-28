@@ -2,10 +2,12 @@
 End-of-study pages for the reviewer survey.
 """
 
-from .workflow_comparison import workflow_comparison_page
+from .end_pr_reviews import end_pr_reviews_page
 from .study_validation import study_validation_page
+from .completion import completion_page
 
 __all__ = [
-    'workflow_comparison_page',
-    'study_validation_page'
+    'end_pr_reviews_page',
+    'study_validation_page',
+    'completion_page'
 ]

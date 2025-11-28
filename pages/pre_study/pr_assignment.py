@@ -18,7 +18,7 @@ def pr_assignment_page():
     """Display the PR assignment page."""
     page_header(
         "PR Assignment",
-        "Review the assigned PR for this study."
+        "Please provide time estimates for the following before reviewing the assigned PR."
     )
     
     # Get participant info
@@ -41,18 +41,27 @@ def pr_assignment_page():
             st.warning("⚠️ Could not load your repository assignment; please go back and re-enter your Participant ID.")
     
     # Check if PR is already in session or fetch from repo-issues by reviewer_id
+    no_pr_available = False
     current_pr = st.session_state['survey_responses'].get('assigned_pr', None)
+    estimates_already_provided = False
+
     if not current_pr and participant_id and assigned_repo and assigned_repo != 'N/A':
         fetched = get_assigned_pr_for_reviewer(participant_id, assigned_repo)
         if fetched['success'] and fetched['pr'] is not None:
             pr_data = fetched['pr']
             st.session_state['survey_responses']['assigned_pr'] = pr_data
-            st.session_state['survey_responses']['pr_number'] = pr_data['number']
-            st.session_state['survey_responses']['pr_title'] = pr_data['title']
             st.session_state['survey_responses']['pr_url'] = pr_data['url']
             st.session_state['survey_responses']['issue_id'] = pr_data['issue_id']
             st.session_state['survey_responses']['issue_url'] = pr_data['issue_url']
             current_pr = pr_data
+
+            # Check if estimates have already been provided
+            reviewer_estimate_db = pr_data.get('reviewer_estimate')
+            new_contributor_estimate_db = pr_data.get('new_contributor_estimate')
+            if reviewer_estimate_db and new_contributor_estimate_db:
+                estimates_already_provided = True
+                st.session_state['survey_responses']['reviewer_estimate'] = reviewer_estimate_db
+                st.session_state['survey_responses']['new_contributor_estimate'] = new_contributor_estimate_db
     
     # Automatically assign a PR if not already assigned
     if not current_pr and participant_id and assigned_repo != 'N/A':
@@ -69,8 +78,6 @@ def pr_assignment_page():
                 if assign_result['success']:
                     # Store PR info in session state
                     st.session_state['survey_responses']['assigned_pr'] = pr_data
-                    st.session_state['survey_responses']['pr_number'] = pr_data['number']
-                    st.session_state['survey_responses']['pr_title'] = pr_data['title']
                     st.session_state['survey_responses']['pr_url'] = pr_data['url']
                     st.session_state['survey_responses']['issue_id'] = pr_data['issue_id']
                     st.session_state['survey_responses']['issue_url'] = pr_data['issue_url']
@@ -79,17 +86,26 @@ def pr_assignment_page():
                     st.success(f"✅ Successfully assigned PR #{pr_data['number']}")
                     st.rerun()
                 else:
-                    st.error(f"⚠️ Error assigning PR: {assign_result['error']}")
+                    st.warning(f"⚠️ Error assigning PR: {assign_result['error']}")
+                    no_pr_available = True
             else:
-                st.error(f"⚠️ {pr_result['error']}")
+                st.warning(f"⚠️ {pr_result['error']}")
+                no_pr_available = True
     
+    # Check if estimates have already been provided (from session or database)
+    if current_pr and not estimates_already_provided:
+        reviewer_estimate_db = current_pr.get('reviewer_estimate')
+        new_contributor_estimate_db = current_pr.get('new_contributor_estimate')
+        if reviewer_estimate_db and new_contributor_estimate_db:
+            estimates_already_provided = True
+            st.session_state['survey_responses']['reviewer_estimate'] = reviewer_estimate_db
+            st.session_state['survey_responses']['new_contributor_estimate'] = new_contributor_estimate_db
+
     # Display PR assignment
     if current_pr:
         st.info(f"""
-        **Assigned PR for Review:**
-        
-        **Issue URL:** {current_pr.get('issue_url', 'N/A')}  
-        **PR URL:** {current_pr.get('url', 'N/A')}
+        **Issue:** {current_pr.get('issue_url', 'N/A')}\n
+        **PR:** {current_pr.get('url', 'N/A')}
         """)
         st.markdown("<div style='margin-bottom: 1.5rem;'></div>", unsafe_allow_html=True)
     elif not participant_id or not assigned_repo or assigned_repo == 'N/A':
@@ -97,11 +113,22 @@ def pr_assignment_page():
     else:
         st.info("Assigning a PR to you...")
         st.markdown("<div style='margin-bottom: 1.5rem;'></div>", unsafe_allow_html=True)
-    
-    # Pre-PR time estimate (only when PR assigned)
+
+    # Pre-PR time estimate (when PR assigned or estimates still needed)
     reviewer_estimate = 'Not selected'
-    if current_pr:
-        ESTIMATE_OPTIONS = [
+    new_contributor_estimate = 'Not selected'
+
+    # Show estimate questions only if not already provided
+    if (current_pr or no_pr_available) and not estimates_already_provided:
+        NEW_CONTRIBUTOR_OPTIONS = [
+            "Not selected",
+            "<30 minutes",
+            "30–60 minutes",
+            "1–2 hours",
+            "2–4 hours",
+            ">4 hours"
+        ]
+        REVIEWER_OPTIONS = [
             "Not selected",
             "<30 minutes",
             "30–60 minutes",
@@ -109,10 +136,19 @@ def pr_assignment_page():
             ">2 hours"
         ]
 
+        previous_new_contributor_estimate = st.session_state['survey_responses'].get('new_contributor_estimate', 'Not selected')
+        new_contributor_estimate = selectbox_question(
+            "Before starting your review, how long do you think it took a <em>new contributor</em> to complete this PR?",
+            NEW_CONTRIBUTOR_OPTIONS,
+            "new_contributor_estimate",
+            previous_new_contributor_estimate,
+            placeholder="Select an estimate"
+        )
+
         previous_estimate = st.session_state['survey_responses'].get('reviewer_estimate', 'Not selected')
         reviewer_estimate = selectbox_question(
-            "Before reviewing this PR, how long do you think it will take you to complete it?",
-            ESTIMATE_OPTIONS,
+            "Before starting your review, how long do you think it will take you to review this PR?",
+            REVIEWER_OPTIONS,
             "reviewer_estimate",
             previous_estimate,
             placeholder="Select an estimate"
@@ -126,18 +162,24 @@ def pr_assignment_page():
             <strong>Next Steps:</strong>
             </p>
             <p style='font-size:18px'>
-            1. Review the assigned PR thoroughly<br>
-            2. Complete the post-PR review survey<br>
-            3. Engage in discussion with the contributor<br>
-            4. Close or merge the PR as appropriate<br>
-            5. Complete the post-PR closed survey
+            1. Assign the PR to yourself<br>
+            2. Review the assigned PR thoroughly<br>
+            3. Complete the post-PR review survey<br>
+            4. Engage in discussion with the contributor<br>
+            5. Close or merge the PR as appropriate<br>
+            6. Complete the post-PR closed survey
             </p>
             """, unsafe_allow_html=True)
-    
-    # Validation function - require estimate when PR is assigned
+
+    # Validation function - require estimates whenever prompts are shown, or allow if already provided
     def validate():
-        if current_pr:
-            return reviewer_estimate != "Not selected"
+        if estimates_already_provided:
+            return True
+        if (current_pr or no_pr_available) and not estimates_already_provided:
+            return (
+                reviewer_estimate != "Not selected" and
+                new_contributor_estimate != "Not selected"
+            )
         return False
     
     # Custom navigation handlers
@@ -150,26 +192,53 @@ def pr_assignment_page():
         save_and_navigate('back')
     
     def handle_next():
-        # Save estimate to session and contributor DB
-        if current_pr and reviewer_estimate != 'Not selected':
-            st.session_state['survey_responses']['reviewer_estimate'] = reviewer_estimate
-            issue_id = st.session_state['survey_responses'].get('issue_id')
-            if issue_id:
-                with st.spinner('Saving your estimate...'):
-                    result = save_reviewer_estimate_for_issue(issue_id, reviewer_estimate)
-                if not result.get('success'):
-                    st.error(f"⚠️ Error saving estimate: {result.get('error')}")
-                    return
-            
+        if not validate():
+            st.error("Please select an estimate before proceeding.")
+            return
+
+        # If estimates already provided, just navigate
+        if estimates_already_provided:
+            saved_reviewer_estimate = st.session_state['survey_responses'].get('reviewer_estimate')
+            saved_new_contributor_estimate = st.session_state['survey_responses'].get('new_contributor_estimate')
+
             # Save session state
             participant_id = st.session_state['survey_responses'].get('participant_id')
             if participant_id:
                 from survey_data import save_session_state
                 save_session_state(participant_id, st.session_state.get('page', 0), st.session_state['survey_responses'])
-            
-            save_and_navigate('next', reviewer_estimate=reviewer_estimate)
-        else:
-            st.error("Please select an estimate before proceeding.")
+
+            save_and_navigate(
+                'next',
+                reviewer_estimate=saved_reviewer_estimate,
+                new_contributor_estimate=saved_new_contributor_estimate
+            )
+        # Otherwise, save new estimates to session and contributor DB
+        elif (current_pr or no_pr_available):
+            st.session_state['survey_responses']['reviewer_estimate'] = reviewer_estimate
+            st.session_state['survey_responses']['new_contributor_estimate'] = new_contributor_estimate
+            issue_id = st.session_state['survey_responses'].get('issue_id')
+            if issue_id:
+                with st.spinner('Saving your estimate...'):
+                    result = save_reviewer_estimate_for_issue(
+                        issue_id,
+                        reviewer_estimate,
+                        new_contributor_estimate=new_contributor_estimate
+                    )
+                if not result.get('success'):
+                    st.error(f"⚠️ Error saving estimate: {result.get('error')}")
+                    return
+
+            # Save session state
+            participant_id = st.session_state['survey_responses'].get('participant_id')
+            if participant_id:
+                from survey_data import save_session_state
+                save_session_state(participant_id, st.session_state.get('page', 0), st.session_state['survey_responses'])
+
+            save_and_navigate(
+                'next',
+                reviewer_estimate=reviewer_estimate,
+                new_contributor_estimate=new_contributor_estimate
+            )
     
     # Navigation
     navigation_buttons(

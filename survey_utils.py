@@ -12,16 +12,47 @@ import openai
 openai_client = openai.OpenAI(api_key=st.secrets.get('OPENAI_KEY', ''))
 
 
-def next_page():
-    """Navigate to the next page."""
-    st.session_state['page'] += 1
+HIDDEN_PAGES = {1, 2}
+
+
+def _compute_target_page(current_page: int, direction: str) -> int:
+    """Return the next visible page index for the requested direction."""
+    step = 1 if direction == 'next' else -1
+    target_page = current_page + step
+    while target_page in HIDDEN_PAGES and target_page >= 0:
+        target_page += step
+    if target_page < 0:
+        target_page = 0
+    return target_page
+
+
+def normalize_page(page_number: int) -> int:
+    """Ensure the given page number is visible by skipping hidden pages."""
+    if page_number in HIDDEN_PAGES:
+        forward_page = _compute_target_page(page_number, 'next')
+        if forward_page != page_number:
+            return forward_page
+        return _compute_target_page(page_number, 'back')
+    return page_number
+
+
+def _go_to_page(target_page: int):
+    st.session_state['page'] = target_page
     st.rerun()
+
+
+def next_page():
+    """Navigate to the next visible page."""
+    current_page = st.session_state.get('page', 0)
+    target_page = _compute_target_page(current_page, 'next')
+    _go_to_page(target_page)
 
 
 def previous_page():
-    """Navigate to the previous page."""
-    st.session_state['page'] -= 1
-    st.rerun()
+    """Navigate to the previous visible page."""
+    current_page = st.session_state.get('page', 0)
+    target_page = _compute_target_page(current_page, 'back')
+    _go_to_page(target_page)
 
 
 def save_and_navigate(direction: str, **responses):
@@ -36,19 +67,15 @@ def save_and_navigate(direction: str, **responses):
         if value is not None:
             st.session_state['survey_responses'][key] = value
     
-    # Compute target page and persist it BEFORE navigation (since st.rerun will interrupt)
     participant_id = st.session_state['survey_responses'].get('participant_id')
+    current_page = st.session_state.get('page', 0)
+    target_page = _compute_target_page(current_page, direction)
+
     if participant_id:
         from survey_data import save_session_state
-        current_page = st.session_state.get('page', 0)
-        target_page = current_page + (1 if direction == 'next' else -1)
         save_session_state(participant_id, target_page, st.session_state['survey_responses'])
 
-    # Navigate
-    if direction == 'next':
-        next_page()
-    elif direction == 'back':
-        previous_page()
+    _go_to_page(target_page)
 
 
 def validate_required_fields(*fields):
@@ -74,7 +101,7 @@ def display_pr_context(pr_url=None, issue_url=None):
     """
     if pr_url or issue_url:
         st.info(f"""
-        **PR URL:** {pr_url or 'N/A'}
+        **PR:** {pr_url or 'N/A'}
         """)
         st.markdown("<div style='margin-bottom: 1rem;'></div>", unsafe_allow_html=True)
 

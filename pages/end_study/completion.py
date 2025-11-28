@@ -11,22 +11,18 @@ from survey_data import save_session_state
 def completion_page():
     """Display the survey completion page."""
     page_header(
-        "Survey Complete",
+        "Survey Completed!",
     )
     
     st.markdown("""
         <p style='font-size:20px'>
-        Your responses have been recorded and will be used for research purposes.
-        </p>
-        
-        <p style='font-size:20px'>
-        Thank you for your contribution to this research!
+        Thank you for participating in our research study.
         </p>
         """, unsafe_allow_html=True)
     
-    # Display summary of responses
-    with st.expander("View your responses"):
-        st.json(st.session_state['survey_responses'])
+    # # Display summary of responses
+    # with st.expander("View your responses"):
+    #     st.json(st.session_state['survey_responses'])
     
     # Mark session as completed
     participant_id = st.session_state['survey_responses'].get('participant_id')
@@ -48,7 +44,8 @@ def completion_page():
             pass
 
     st.markdown("""
-        <p style='font-size:18px; text-align: center; margin-top: 2rem; color: #666;'>
-        You may now close this window.
+        <p style='font-size:16px; margin-bottom: 1rem;'>
+        If you have any questions or concerns,
+        please contact jennjwang@stanford.edu.
         </p>
         """, unsafe_allow_html=True)

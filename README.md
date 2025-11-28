@@ -10,8 +10,7 @@ The survey is organized into several sections:
 
 - **Consent** (Page 0): Study introduction and consent
 - **Participant ID** (Page 1): Participant identification
-- **Developer Experience** (Page 2): Professional development experience
-- **Codebase Experience** (Page 3): Experience with the specific codebase
+- **PR Assignment** (Page 3): Assign and confirm the study PR
 - **Pre-Study Complete** (Page 4): Pre-study completion confirmation
 
 ### Post-PR-Review (Pages 5-7)
@@ -25,22 +24,20 @@ The survey is organized into several sections:
 - **Collaboration Questions** (Page 8): Assessment of collaboration with contributor
 - **Contributor Perception** (Page 9): Perception of contributor after PR discussion
 
-### End of Study (Page 10)
+### End of Study (Pages 11-12)
 
-- **Workflow Comparison** (Page 10): Comparison with normal reviewing workflow
+- **End of PR Reviews** (Page 11): Summary screen confirming all assigned PRs are complete
+- **Study Validation** (Page 12): Reflection on how the study workflow compares to normal responsibilities
 
-### Completion (Pages 11-12)
+### Completion (Page 13)
 
-- **Survey Complete** (Page 11): Survey completion confirmation
-- **Thank You** (Page 12): Final thank you page
+- **Survey Complete** (Page 13): Final thank you page and study contact information
 
 ## Questions Included
 
 ### Pre-Study Questions
 
-1. **Professional Experience**: Years of professional development experience
-2. **Occupation Description**: Brief description of current work
-3. **Codebase Experience**: Lines of code written/modified in the codebase
+The pre-study section now focuses solely on verifying participant information and confirming the assigned PR.
 
 ### Post-PR-Review Questions
 
@@ -86,7 +83,8 @@ The survey is organized into several sections:
 
 ### End of Study Questions
 
-1. **Workflow Comparison**: How the study workflow compared to normal responsibilities
+1. **End of PR Reviews Summary**: Confirmation that all required PR reviews are complete
+2. **Study Validation**: How the study workflow compared to normal responsibilities
 
 ## Running the Survey
 
@@ -129,8 +127,7 @@ reviewer/
     ├── pre_study/
     ├── post_pr_review/
     ├── post_pr_closed/
-    ├── end_study/
-    └── completion/
+    └── end_study/            # Includes end-of-study + completion pages
 ```
 
 ## Customization
@@ -152,4 +149,14 @@ Survey responses are stored in `st.session_state['survey_responses']` and can be
 - Processed for analysis
 
 The survey is designed to be integrated with data collection systems as needed for the research study.
+
+### Contributor Repo Schema
+
+The reviewer workflow interacts with the contributor-owned `repo-issues` table (hosted in Supabase). The table now includes the following key fields that the survey code expects:
+
+- `reviewer_assigned`, `is_assigned`, `reviewer_id`, `reviewer_assigned_on`: track which reviewer currently owns the PR.
+- `reviewer_estimate`, `is_closed`, `is_merged`, `is_reviewed`: store reviewer-specific metadata and status updates written from the survey.
+- `using_ai`, `issue_sequence`: additional contributor signals now surfaced when selecting or displaying PR assignments.
+
+Make sure these columns exist in the contributor database before running the updated survey stack.
 # review-survey

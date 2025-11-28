@@ -32,6 +32,7 @@ def contributor_perception_page():
     # Load previous responses
     previous_responses = st.session_state['survey_responses'].get('perception_responses', {})
     previous_perception_description = st.session_state['survey_responses'].get('perception_description', '')
+    previous_effort_response = st.session_state['survey_responses'].get('perception_effort', '')
     
     # Contributor perception rating questions
     responses = {}
@@ -90,31 +91,74 @@ def contributor_perception_page():
     else:
         perception_description = previous_perception_description
     
+    st.markdown("<div style='margin-bottom: 2rem;'></div>", unsafe_allow_html=True)
+    
+    # New effort question with audio or text option
+    st.markdown("""
+        <p style='font-size:18px; font-weight:600; margin-bottom: 1.5rem;'>
+        How much effort do you think the contributor spent in understanding the problem and writing code? What gave you that impression?
+        </p>
+        """, unsafe_allow_html=True)
+    
+    # Create tabs for audio and text input
+    tab3, tab4 = st.tabs(["🎤 Record Audio", "⌨️ Type Response"])
+    
+    with tab3:
+        st.markdown("""
+            <p style='font-size:14px; margin-bottom: 0.5rem; color: #666;'>
+            Click the microphone button below to record your response. Your audio will be transcribed automatically.
+            </p>
+            """, unsafe_allow_html=True)
+        effort_transcript = record_audio("perception_effort", min_duration=10, max_duration=300)
+    
+    with tab4:
+        st.markdown("""
+            <p style='font-size:14px; margin-bottom: 0.5rem; color: #666;'>
+            Type your response in the text box below.
+            </p>
+            """, unsafe_allow_html=True)
+        effort_text_response = st.text_area(
+            "Your response:",
+            key="perception_effort_text",
+            value=previous_effort_response,
+            height=150,
+            placeholder="Type your answer here...",
+            label_visibility="collapsed"
+        )
+    
+    # Use whichever response is available
+    if effort_transcript:
+        perception_effort = effort_transcript
+    elif effort_text_response and effort_text_response.strip():
+        perception_effort = effort_text_response
+    else:
+        perception_effort = previous_effort_response
+    
+    # Save values to session state immediately so they're preserved
+    st.session_state['survey_responses']['perception_responses'] = responses
+    st.session_state['survey_responses']['perception_description'] = perception_description
+    st.session_state['survey_responses']['perception_effort'] = perception_effort
+    
     # Validation function
     def validate():
         return (all(response != "Not selected" for response in responses.values()) and 
-                perception_description.strip() != "")
+                perception_description.strip() != "" and
+                perception_effort.strip() != "")
     
     def handle_back():
-        save_and_navigate('back', perception_responses=responses, perception_description=perception_description)
+        save_and_navigate('back', perception_responses=responses, perception_description=perception_description, perception_effort=perception_effort)
 
     def handle_next():
         if not validate():
             return
-        st.session_state['survey_responses']['perception_responses'] = responses
-        st.session_state['survey_responses']['perception_description'] = perception_description
 
         participant_id = st.session_state['survey_responses'].get('participant_id')
-        pr_number = st.session_state['survey_responses'].get('pr_number', 'N/A')
-        pr_title = st.session_state['survey_responses'].get('pr_title', 'N/A')
         pr_url = st.session_state['survey_responses'].get('pr_url', 'N/A')
 
-        if participant_id and pr_number != 'N/A':
+        if participant_id:
             with st.spinner('Saving your responses...'):
                 result = save_post_pr_closed_responses(
                     participant_id,
-                    pr_number,
-                    pr_title,
                     pr_url,
                     st.session_state['survey_responses']
                 )
