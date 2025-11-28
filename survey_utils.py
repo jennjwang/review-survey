@@ -119,7 +119,7 @@ def get_audio_duration(file):
         return None
 
 
-def record_audio(question_key, min_duration=20, max_duration=120):
+def record_audio(question_key, min_duration=20, max_duration=600):
     """
     Record and transcribe audio for a question.
     

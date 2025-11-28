@@ -24,14 +24,15 @@ The survey is organized into several sections:
 - **Collaboration Questions** (Page 8): Assessment of collaboration with contributor
 - **Contributor Perception** (Page 9): Perception of contributor after PR discussion
 
-### End of Study (Pages 11-12)
+Participants repeat the PR-review cycle (Pages 5-10) until they have completed **at least four** PR reviews. All reviewed PRs must be merged or closed (with the collaboration/perception questionnaire submitted) before the study can be finalized.
 
-- **End of PR Reviews** (Page 11): Summary screen confirming all assigned PRs are complete
-- **Study Validation** (Page 12): Reflection on how the study workflow compares to normal responsibilities
+### End of Study (Page 11)
 
-### Completion (Page 13)
+- **Study Validation** (Page 11): Reflection on how the study workflow compares to normal responsibilities
 
-- **Survey Complete** (Page 13): Final thank you page and study contact information
+### Completion (Page 12)
+
+- **Survey Complete** (Page 12): Final thank you page and study contact information
 
 ## Questions Included
 
@@ -83,8 +84,7 @@ The pre-study section now focuses solely on verifying participant information an
 
 ### End of Study Questions
 
-1. **End of PR Reviews Summary**: Confirmation that all required PR reviews are complete
-2. **Study Validation**: How the study workflow compared to normal responsibilities
+1. **Study Validation**: How the study workflow compared to normal responsibilities once the minimum (four) PR reviews are complete
 
 ## Running the Survey
 

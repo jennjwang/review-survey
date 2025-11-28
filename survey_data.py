@@ -7,6 +7,8 @@ from supabase import create_client
 from contributor_config import get_contributor_db_creds, CONTRIBUTOR_TABLES
 from survey_questions import NASA_TLX_QUESTIONS, CODE_QUALITY_QUESTIONS
 
+MIN_COMPLETED_REVIEWS = 2
+
 
 # Initialize Supabase client for reviewer data
 def get_supabase_client():
@@ -346,7 +348,6 @@ def save_post_pr_closed_responses(participant_id: str, pr_url: str, responses: d
             data[f'collaboration_{key}'] = value
         
         data['collaboration_description'] = responses.get('collaboration_description')
-        data['collaboration_engagement'] = responses.get('collaboration_engagement')
         
         # Add perception responses
         perception_responses = responses.get('perception_responses', {})
@@ -512,7 +513,7 @@ def get_random_unassigned_pr(repository: str):
         if not available_issues:
             return {
                 'success': False,
-                'error': f"No unassigned PRs available for review in repository {repository}",
+                'error': f"Sorry, please check back later! There are no more unassigned PRs in the repository {repository} right now.",
                 'pr': None
             }
         
@@ -1005,9 +1006,8 @@ def determine_current_page(participant_id: str, survey_responses: dict = None):
         8: pr_status_page - PR status check (can request another PR)
         9: collaboration_questions_page - Collaboration questions (if PR closed/merged)
         10: contributor_perception_page - Contributor perception questions
-        11: end_pr_reviews_page - End of PR reviews summary
-        12: study_validation_page - Study validation
-        13: completion_page - Survey completion
+        11: study_validation_page - Study validation
+        12: completion_page - Survey completion
     """
     if not participant_id:
         return 0  # No participant ID, start at beginning
@@ -1058,8 +1058,14 @@ def determine_current_page(participant_id: str, survey_responses: dict = None):
             return 5  # Error getting progress, start with NASA-TLX questions
 
         progress = progress_result.get('progress') or {}
+        completed_pr_reviews = progress.get('post_pr_review_count', 0)
+        closed_pr_reviews = progress.get('post_pr_closed_count', 0)
         post_pr_review_entries = progress.get('post_pr_review_data') or []
         current_pr_url = pr_data.get('url')
+        all_reviewed_prs_closed = (
+            closed_pr_reviews >= completed_pr_reviews and completed_pr_reviews > 0
+        )
+        initial_review_quota_met = completed_pr_reviews >= MIN_COMPLETED_REVIEWS
 
         def normalize_url(url: str) -> str:
             if not url:
@@ -1124,6 +1130,8 @@ def determine_current_page(participant_id: str, survey_responses: dict = None):
         session_assigned_pr = session_responses.get('assigned_pr') if session_responses else None
         shared_sources = collect_sources(current_post_pr_entry, pr_data, session_assigned_pr, session_responses)
 
+        review_quota_met = completed_pr_reviews >= MIN_COMPLETED_REVIEWS
+
         # Check NASA TLX completion directly from database
         nasa_complete = check_nasa_tlx_completed(participant_id, current_pr_url)
         print(f"[DEBUG] NASA TLX completed from database: {nasa_complete}")
@@ -1142,6 +1150,19 @@ def determine_current_page(participant_id: str, survey_responses: dict = None):
         if not ai_detection_complete:
             return 7  # AI detection questions incomplete
 
+        if initial_review_quota_met and not review_quota_met:
+            print(
+                f"[DEBUG] Initial review quota met ({completed_pr_reviews}/{MIN_COMPLETED_REVIEWS}). Proceeding to end-of-study."
+            )
+            if not all_reviewed_prs_closed:
+                print(
+                    f"[DEBUG] Reviewer still has open PRs ({closed_pr_reviews}/{completed_pr_reviews}). Redirecting to PR status page."
+                )
+                return 8
+            if not progress.get('end_study_completed'):
+                return 11  # Go directly to study validation
+            return 12  # Completion page once validation done
+
         # After post-PR review questions, go to PR status page
         # Check if PR is closed/merged
         if not is_closed and not is_merged:
@@ -1151,12 +1172,24 @@ def determine_current_page(participant_id: str, survey_responses: dict = None):
         if progress.get('post_pr_closed_count', 0) == 0:
             return 9  # PR closed but no post-PR closed data, go to collaboration questions
 
+        # Ensure minimum number of PR reviews before end-of-study
+        if completed_pr_reviews < MIN_COMPLETED_REVIEWS:
+            print(
+                f"[DEBUG] Completed PR reviews {completed_pr_reviews}/{MIN_COMPLETED_REVIEWS}. Redirecting to PR status page."
+            )
+            return 8  # Need to complete additional PR reviews
+
         # Check end-study completion
         if not progress.get('end_study_completed'):
-            return 11  # Post-PR closed complete, go to workflow comparison
+            return 11  # Post-PR closed complete, go to study validation
 
-        # Everything complete
-        return 13  # Go to completion page
+        if closed_pr_reviews < completed_pr_reviews:
+            print(
+                f"[DEBUG] Cannot finish - pending PR closures ({closed_pr_reviews}/{completed_pr_reviews}). Redirecting to PR status page."
+            )
+            return 8
+
+        return 12  # Go to completion page
 
     except Exception as e:
         print(f"Error determining current page: {e}")

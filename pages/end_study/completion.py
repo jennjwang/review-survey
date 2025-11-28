@@ -5,11 +5,34 @@ Survey completion page for the reviewer survey.
 import streamlit as st
 from survey_components import page_header, navigation_buttons
 from survey_utils import next_page
-from survey_data import save_session_state
+from survey_data import save_session_state, get_repository_assignment, list_assigned_prs_for_reviewer
 
 
 def completion_page():
     """Display the survey completion page."""
+    participant_id = st.session_state['survey_responses'].get('participant_id')
+    assigned_repo = st.session_state['survey_responses'].get('assigned_repository')
+
+    if participant_id and not assigned_repo:
+        repo_result = get_repository_assignment(participant_id)
+        if repo_result['success']:
+            assigned_repo = repo_result['repository']
+            st.session_state['survey_responses']['assigned_repository'] = assigned_repo
+            st.session_state['survey_responses']['repository_url'] = repo_result['url']
+
+    if participant_id and assigned_repo:
+        assigned = list_assigned_prs_for_reviewer(participant_id, assigned_repo)
+        if assigned.get('success'):
+            open_prs = [
+                pr for pr in assigned.get('prs', [])
+                if not pr.get('is_closed') and not pr.get('is_merged')
+            ]
+            if open_prs:
+                st.warning("You still have PRs to review or close. Redirecting to PR Status.")
+                st.session_state['page'] = 8
+                st.rerun()
+                return
+
     page_header(
         "Survey Completed!",
     )

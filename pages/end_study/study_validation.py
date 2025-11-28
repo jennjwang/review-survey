@@ -6,13 +6,28 @@ Asks about how the study workflow compared to normal work.
 import streamlit as st
 from survey_components import page_header, navigation_buttons
 from survey_utils import save_and_navigate, record_audio
-from survey_data import save_end_study_responses
+from survey_data import save_end_study_responses, get_participant_progress, MIN_COMPLETED_REVIEWS
 
 
 def study_validation_page():
     """Display study validation questions about workflow comparison."""
+    participant_id = st.session_state['survey_responses'].get('participant_id')
+    progress_result = get_participant_progress(participant_id) if participant_id else None
+    progress = progress_result.get('progress') if progress_result and progress_result.get('success') else {}
+    completed_reviews = progress.get('post_pr_review_count', 0)
+    closed_reviews = progress.get('post_pr_closed_count', 0)
+
+    if completed_reviews < MIN_COMPLETED_REVIEWS or closed_reviews < MIN_COMPLETED_REVIEWS:
+        st.warning(
+            "Please complete and close the minimum number of PR reviews before reflecting on the overall study. Redirecting to PR Status."
+        )
+        st.session_state['page'] = 8
+        st.rerun()
+        return
+
     page_header(
-        "Study Experience"
+        "Overall Study Experience",
+        "Reflect on your overall experience as a reviewer in this study."
     )
 
     # Load previous responses
@@ -21,7 +36,7 @@ def study_validation_page():
     # Question: Workflow comparison
     st.markdown("""
         <p style='font-size:18px; font-weight:600; margin-bottom: 1.5rem;'>
-        How different did your workflow in this study feel compared to your normal day-to-day responsibilities? How did the PRs you reviewed during this study compare to the ones you usually handle?
+        How different did your workflow during this study feel compared to your typical day-to-day? How did the PRs you reviewed compare to the ones you usually handle?
         </p>
         """, unsafe_allow_html=True)
 
@@ -34,7 +49,7 @@ def study_validation_page():
             Click the microphone button below to record your response. Your audio will be transcribed automatically.
             </p>
             """, unsafe_allow_html=True)
-        transcript = record_audio("workflow_comparison", min_duration=10, max_duration=300)
+        transcript = record_audio("workflow_comparison", min_duration=10, max_duration=600)
 
     with tab2:
         st.markdown("""
@@ -88,4 +103,3 @@ def study_validation_page():
         validation_fn=validate,
         validation_error="Please provide a response before proceeding."
     )
-

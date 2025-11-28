@@ -50,6 +50,41 @@ def contributor_perception_page():
     
     st.markdown("<div style='margin-bottom: 2rem;'></div>", unsafe_allow_html=True)
     
+    # New effort question with audio or text option
+    st.markdown("""
+        <p style='font-size:18px; font-weight:600; margin-bottom: 1.5rem;'>
+        How much effort do you think the contributor spent in understanding the problem and writing code? What gave you that impression?
+        </p>
+        """, unsafe_allow_html=True)
+    
+    # Create tabs for audio and text input
+    tab3, tab4 = st.tabs(["🎤 Record Audio", "⌨️ Type Response"])
+    
+    with tab3:
+        st.markdown("""
+            <p style='font-size:14px; margin-bottom: 0.5rem; color: #666;'>
+            Click the microphone button below to record your response. Your audio will be transcribed automatically.
+            </p>
+            """, unsafe_allow_html=True)
+        effort_transcript = record_audio("perception_effort", min_duration=10, max_duration=600)
+    
+    with tab4:
+        st.markdown("""
+            <p style='font-size:14px; margin-bottom: 0.5rem; color: #666;'>
+            Type your response in the text box below.
+            </p>
+            """, unsafe_allow_html=True)
+        effort_text_response = st.text_area(
+            "Your response:",
+            key="perception_effort_text",
+            value=previous_effort_response,
+            height=150,
+            placeholder="Type your answer here...",
+            label_visibility="collapsed"
+        )
+    
+    st.markdown("<div style='margin-bottom: 2rem;'></div>", unsafe_allow_html=True)
+
     # Open-ended perception question with audio or text option
     st.markdown("""
         <p style='font-size:18px; font-weight:600; margin-bottom: 1.5rem;'>
@@ -66,7 +101,7 @@ def contributor_perception_page():
             Click the microphone button below to record your response. Your audio will be transcribed automatically.
             </p>
             """, unsafe_allow_html=True)
-        transcript = record_audio("perception_description", min_duration=10, max_duration=300)
+        transcript = record_audio("perception_description", min_duration=10, max_duration=600)
     
     with tab2:
         st.markdown("""
@@ -90,41 +125,6 @@ def contributor_perception_page():
         perception_description = text_response
     else:
         perception_description = previous_perception_description
-    
-    st.markdown("<div style='margin-bottom: 2rem;'></div>", unsafe_allow_html=True)
-    
-    # New effort question with audio or text option
-    st.markdown("""
-        <p style='font-size:18px; font-weight:600; margin-bottom: 1.5rem;'>
-        How much effort do you think the contributor spent in understanding the problem and writing code? What gave you that impression?
-        </p>
-        """, unsafe_allow_html=True)
-    
-    # Create tabs for audio and text input
-    tab3, tab4 = st.tabs(["🎤 Record Audio", "⌨️ Type Response"])
-    
-    with tab3:
-        st.markdown("""
-            <p style='font-size:14px; margin-bottom: 0.5rem; color: #666;'>
-            Click the microphone button below to record your response. Your audio will be transcribed automatically.
-            </p>
-            """, unsafe_allow_html=True)
-        effort_transcript = record_audio("perception_effort", min_duration=10, max_duration=300)
-    
-    with tab4:
-        st.markdown("""
-            <p style='font-size:14px; margin-bottom: 0.5rem; color: #666;'>
-            Type your response in the text box below.
-            </p>
-            """, unsafe_allow_html=True)
-        effort_text_response = st.text_area(
-            "Your response:",
-            key="perception_effort_text",
-            value=previous_effort_response,
-            height=150,
-            placeholder="Type your answer here...",
-            label_visibility="collapsed"
-        )
     
     # Use whichever response is available
     if effort_transcript:

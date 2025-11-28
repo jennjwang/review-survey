@@ -23,7 +23,6 @@ from .post_pr_closed import (
 )
 
 from .end_study import (
-    end_pr_reviews_page,
     study_validation_page,
     completion_page
 )
@@ -45,7 +44,6 @@ __all__ = [
     'contributor_perception_page',
     
     # End of study pages
-    'end_pr_reviews_page',
     'study_validation_page',
     'completion_page'
 ]

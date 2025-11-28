@@ -89,7 +89,7 @@ def ai_detection_page():
             Click the microphone button below to record your response. Your audio will be transcribed automatically.
             </p>
             """, unsafe_allow_html=True)
-        transcript = record_audio("ai_reasoning", min_duration=10, max_duration=180)
+        transcript = record_audio("ai_reasoning", min_duration=10, max_duration=600)
     
     with tab2:
         st.markdown("""
@@ -132,7 +132,7 @@ def ai_detection_page():
             Click the microphone button below to record your response. Your audio will be transcribed automatically.
             </p>
             """, unsafe_allow_html=True)
-        strategy_transcript = record_audio("ai_review_strategy", min_duration=10, max_duration=180)
+        strategy_transcript = record_audio("ai_review_strategy", min_duration=10, max_duration=600)
     
     with tab4:
         st.markdown("""

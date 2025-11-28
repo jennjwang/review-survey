@@ -23,7 +23,6 @@ from pages import (
     contributor_perception_page,
 
     # End of study pages
-    end_pr_reviews_page,
     study_validation_page,
 
     # Completion pages
@@ -90,11 +89,10 @@ def main():
         10: contributor_perception_page,    # Contributor perception questions
 
         # End of study section
-        11: end_pr_reviews_page,            # End of PR reviews summary
-        12: study_validation_page,          # Study validation
+        11: study_validation_page,          # Study validation
 
         # Completion section
-        13: completion_page                 # Survey completion
+        12: completion_page                 # Survey completion
     }
     
     current_page = st.session_state.get('page', 0)

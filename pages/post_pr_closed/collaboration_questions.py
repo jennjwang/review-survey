@@ -33,7 +33,6 @@ def collaboration_questions_page():
     # Load previous responses
     previous_responses = st.session_state['survey_responses'].get('collaboration_responses', {})
     previous_collaboration_description = st.session_state['survey_responses'].get('collaboration_description', '')
-    previous_engagement_response = st.session_state['survey_responses'].get('collaboration_engagement', '')
     
     # Collaboration rating questions
     responses = {}
@@ -67,7 +66,7 @@ def collaboration_questions_page():
             Click the microphone button below to record your response. Your audio will be transcribed automatically.
             </p>
             """, unsafe_allow_html=True)
-        transcript = record_audio("collaboration_description", min_duration=10, max_duration=300)
+        transcript = record_audio("collaboration_description", min_duration=10, max_duration=600)
     
     with tab2:
         st.markdown("""
@@ -92,62 +91,17 @@ def collaboration_questions_page():
     else:
         collaboration_description = previous_collaboration_description
     
-    st.markdown("<div style='margin-bottom: 2rem;'></div>", unsafe_allow_html=True)
-    
-    # New engagement question with audio or text option
-    st.markdown("""
-        <p style='font-size:18px; font-weight:600; margin-bottom: 1.5rem;'>
-        During the code review, how did you engage with the contributor's response?
-        </p>
-        """, unsafe_allow_html=True)
-    
-    # Create tabs for audio and text input
-    tab3, tab4 = st.tabs(["🎤 Record Audio", "⌨️ Type Response"])
-    
-    with tab3:
-        st.markdown("""
-            <p style='font-size:14px; margin-bottom: 0.5rem; color: #666;'>
-            Click the microphone button below to record your response. Your audio will be transcribed automatically.
-            </p>
-            """, unsafe_allow_html=True)
-        engagement_transcript = record_audio("collaboration_engagement", min_duration=10, max_duration=300)
-    
-    with tab4:
-        st.markdown("""
-            <p style='font-size:14px; margin-bottom: 0.5rem; color: #666;'>
-            Type your response in the text box below.
-            </p>
-            """, unsafe_allow_html=True)
-        engagement_text_response = st.text_area(
-            "Your response:",
-            key="collaboration_engagement_text",
-            value=previous_engagement_response,
-            height=150,
-            placeholder="Type your answer here...",
-            label_visibility="collapsed"
-        )
-    
-    # Use whichever response is available
-    if engagement_transcript:
-        collaboration_engagement = engagement_transcript
-    elif engagement_text_response and engagement_text_response.strip():
-        collaboration_engagement = engagement_text_response
-    else:
-        collaboration_engagement = previous_engagement_response
-    
     # Save values to session state immediately so they're preserved
     st.session_state['survey_responses']['collaboration_responses'] = responses
     st.session_state['survey_responses']['collaboration_description'] = collaboration_description
-    st.session_state['survey_responses']['collaboration_engagement'] = collaboration_engagement
-    
+
     # Validation function
     def validate():
         return (all(response != "Not selected" for response in responses.values()) and 
-                collaboration_description.strip() != "" and
-                collaboration_engagement.strip() != "")
-    
+                collaboration_description.strip() != "")
+
     def handle_back():
-        save_and_navigate('back', collaboration_responses=responses, collaboration_description=collaboration_description, collaboration_engagement=collaboration_engagement)
+        save_and_navigate('back', collaboration_responses=responses, collaboration_description=collaboration_description)
 
     def handle_next():
         if not validate():
