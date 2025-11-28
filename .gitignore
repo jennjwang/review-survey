@@ -3,3 +3,4 @@ secrets.toml
 __pycache__/
 .specstory/
 .cursorindexingignore
+*.pyc
