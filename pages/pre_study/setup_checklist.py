@@ -19,34 +19,39 @@ def setup_checklist_page():
     responses = st.session_state['survey_responses']
     participant_id = responses.get('participant_id')
 
-    # Check if reviewer has already started (has completed at least one review OR has an assigned PR)
+    # Check if reviewer has already started (has completed at least one review OR has an assigned PR OR has provided time estimate)
     if participant_id:
+        # Check if they have a PR URL or time estimate in session state
+        if responses.get('pr_url') or (responses.get('reviewer_estimate') and responses.get('reviewer_estimate') != 'Not selected'):
+            print("[DEBUG] Skipping checklist: PR URL or time estimate found in session state")
+            st.session_state['page'] += 1
+            st.rerun()
+            return
+
         progress_result = get_participant_progress(participant_id)
         if progress_result.get('success') and progress_result.get('progress'):
             # If they already have completed a review, skip the checklist
             if progress_result['progress'].get('post_pr_review_count', 0) > 0:
+                print("[DEBUG] Skipping checklist: has completed reviews")
                 st.session_state['page'] += 1
                 st.rerun()
                 return
 
-        # Also check if they have any assigned PRs or have provided time estimates
+        # Also check if they have any assigned PRs in the database
         repo_result = get_repository_assignment(participant_id)
         if repo_result.get('success') and repo_result.get('repository'):
             assigned_repo = repo_result['repository']
             prs_result = list_assigned_prs_for_reviewer(participant_id, assigned_repo)
+            print(f"[DEBUG] PRs result: success={prs_result.get('success')}, prs={prs_result.get('prs')}")
             if prs_result.get('success') and prs_result.get('prs'):
                 prs = prs_result['prs']
+                print(f"[DEBUG] Found {len(prs)} assigned PRs")
                 # Skip if they have at least one assigned PR
                 if len(prs) > 0:
+                    print("[DEBUG] Skipping checklist: has assigned PRs")
                     st.session_state['page'] += 1
                     st.rerun()
                     return
-                # Skip if any PR has a time estimate provided
-                for pr in prs:
-                    if pr.get('reviewer_estimate') is not None and pr.get('reviewer_estimate') != 'Not selected':
-                        st.session_state['page'] += 1
-                        st.rerun()
-                        return
 
     page_header(
         "Before You Start Reviewing",

@@ -29,15 +29,52 @@ def _sync_artifact_status(issue_id, status=None):
 
 def pr_assignment_page():
     """Display the PR assignment page."""
-    page_header(
-        "PR Assignment",
-        "Please provide time estimates for the following before reviewing the assigned PR."
-    )
-    
     # Get participant info
     participant_id = st.session_state['survey_responses'].get('participant_id', '')
     assigned_repo = st.session_state['survey_responses'].get('assigned_repository', 'N/A')
     repository_url = st.session_state['survey_responses'].get('repository_url', 'N/A')
+
+    # Check if PR is already assigned with time estimates - if so, skip this page
+    current_pr = st.session_state['survey_responses'].get('assigned_pr', None)
+    if current_pr:
+        reviewer_estimate = current_pr.get('reviewer_estimate') or st.session_state['survey_responses'].get('reviewer_estimate')
+        new_contributor_estimate = current_pr.get('new_contributor_estimate') or st.session_state['survey_responses'].get('new_contributor_estimate')
+
+        # If both estimates are provided and not "Not selected", skip this page
+        if (reviewer_estimate and reviewer_estimate != 'Not selected' and
+            new_contributor_estimate and new_contributor_estimate != 'Not selected'):
+            print("[DEBUG] Skipping PR assignment page: PR already assigned with time estimates")
+            st.session_state['page'] += 1
+            st.rerun()
+            return
+
+    # Check database for assigned PR if not in session state
+    if not current_pr and participant_id and assigned_repo and assigned_repo != 'N/A':
+        fetched = get_assigned_pr_for_reviewer(participant_id, assigned_repo)
+        if fetched['success'] and fetched['pr'] is not None:
+            pr_data = fetched['pr']
+            reviewer_estimate_db = pr_data.get('reviewer_estimate')
+            new_contributor_estimate_db = pr_data.get('new_contributor_estimate')
+
+            # If both estimates are provided in DB, skip this page
+            if (reviewer_estimate_db and reviewer_estimate_db != 'Not selected' and
+                new_contributor_estimate_db and new_contributor_estimate_db != 'Not selected'):
+                print("[DEBUG] Skipping PR assignment page: Found PR in DB with time estimates")
+                # Store in session state before skipping
+                st.session_state['survey_responses']['assigned_pr'] = pr_data
+                st.session_state['survey_responses']['pr_url'] = pr_data['url']
+                st.session_state['survey_responses']['issue_id'] = pr_data['issue_id']
+                st.session_state['survey_responses']['issue_url'] = pr_data['issue_url']
+                st.session_state['survey_responses']['reviewer_estimate'] = reviewer_estimate_db
+                st.session_state['survey_responses']['new_contributor_estimate'] = new_contributor_estimate_db
+                st.session_state['page'] += 1
+                st.rerun()
+                return
+
+    page_header(
+        "PR Assignment",
+        "Please provide time estimates for the following before reviewing the assigned PR."
+    )
 
     # If repository assignment is missing (e.g., after resume), fetch it now
     if participant_id and (not assigned_repo or assigned_repo == 'N/A'):
