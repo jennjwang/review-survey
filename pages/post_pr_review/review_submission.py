@@ -49,7 +49,7 @@ def review_submission_page():
     """)
 
     st.markdown(
-        "<p style='font-size:16px; margin-top: 1rem; margin-bottom: 1rem;'>"
+        "<p style='font-size:18px; font-weight: 400; margin-top: 1rem; margin-bottom: 1rem;'>"
         "<b>Important:</b> Remember to keep swe-prod-recorder running while you review the PR.</p>",
         unsafe_allow_html=True
     )

@@ -95,9 +95,9 @@ def pr_status_page():
                             st.session_state['page'] = 4  # review_submission_page
                             st.rerun()
                         else:
-                            return f"⚠️ Error assigning PR: {assign_result['error']}"
+                            return f"Error assigning PR: {assign_result['error']}"
                     else:
-                        return f"⚠️ {pr_result.get('error') or 'No unassigned PRs available in this repo.'}"
+                        return f"{pr_result.get('error') or 'No unassigned PRs available in this repo.'}"
         return None
 
     st.markdown("<div style='margin-bottom: 1.5rem;'></div>", unsafe_allow_html=True)
