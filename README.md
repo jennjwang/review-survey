@@ -10,6 +10,7 @@ The survey is organized into several sections:
 
 - **Consent** (Page 0): Study introduction and consent
 - **Participant ID** (Page 1): Participant identification
+- **Setup Checklist** (Page 2): Confirm access to the swe-productivity fork and recording tooling
 - **PR Assignment** (Page 3): Assign and confirm the study PR
 - **Pre-Study Complete** (Page 4): Pre-study completion confirmation
 
@@ -19,26 +20,27 @@ The survey is organized into several sections:
 - **Code Quality Ratings** (Page 6): Code quality assessment on multiple dimensions
 - **AI Detection** (Page 7): Assessment of whether PR contains AI-generated code
 
-### Post-PR-Closed (Pages 8-9)
+### Post-PR-Closed (Pages 8-11)
 
 - **Collaboration Questions** (Page 8): Assessment of collaboration with contributor
 - **Contributor Perception** (Page 9): Perception of contributor after PR discussion
+- **Artifact Upload** (Page 11): Upload SpecStory export and swe-prod-recorder data to Google Drive
 
-Participants repeat the PR-review cycle (Pages 5-10) until they have completed **at least four** PR reviews. All reviewed PRs must be merged or closed (with the collaboration/perception questionnaire submitted) before the study can be finalized.
+Participants repeat the PR-review cycle (Pages 5-11) until they have completed **at least four** PR reviews. All reviewed PRs must be merged or closed (with collaboration/perception responses submitted and artifacts uploaded) before the study can be finalized.
 
-### End of Study (Page 11)
+### End of Study (Page 12)
 
-- **Study Validation** (Page 11): Reflection on how the study workflow compares to normal responsibilities
+- **Study Validation** (Page 12): Reflection on how the study workflow compares to normal responsibilities
 
-### Completion (Page 12)
+### Completion (Page 13)
 
-- **Survey Complete** (Page 12): Final thank you page and study contact information
+- **Survey Complete** (Page 13): Final thank you page and study contact information
 
 ## Questions Included
 
 ### Pre-Study Questions
 
-The pre-study section now focuses solely on verifying participant information and confirming the assigned PR.
+The pre-study section now focuses on verifying participant information, confirming access to required tooling (setup checklist), and confirming the assigned PR.
 
 ### Post-PR-Review Questions
 
@@ -82,9 +84,13 @@ The pre-study section now focuses solely on verifying participant information an
    - Overall collaboration description
    - Impact on contributor perception
 
+4. **Artifact Upload**:
+   - SpecStory export (.zip)
+   - swe-prod-recorder `/data` zip
+
 ### End of Study Questions
 
-1. **Study Validation**: How the study workflow compared to normal responsibilities once the minimum (four) PR reviews are complete
+1. **Study Validation**: How the study workflow compared to normal responsibilities once the minimum (four) PR reviews and artifact uploads are complete
 
 ## Running the Survey
 
@@ -159,4 +165,13 @@ The reviewer workflow interacts with the contributor-owned `repo-issues` table (
 - `using_ai`, `issue_sequence`: additional contributor signals now surfaced when selecting or displaying PR assignments.
 
 Make sure these columns exist in the contributor database before running the updated survey stack.
+
+### Google Drive Uploads
+
+Reviewers must upload their SpecStory export and swe-prod-recorder data for each PR. Configure the following secrets for Drive uploads:
+
+- `gcp_service_account`: Service-account JSON (or provide `GCP_SERVICE_ACCOUNT_FILE`).
+- `REVIEWER_GDRIVE_FOLDER_ID` (or `GDRIVE_FOLDER_ID`): The Drive folder where uploads should be stored.
+
+Uploads are automatically organized into nested folders by participant and PR ID.
 # review-survey

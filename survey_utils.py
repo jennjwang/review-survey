@@ -4,6 +4,8 @@ Utility functions for the reviewer survey application.
 
 import io
 import wave
+from urllib.parse import urlparse
+
 import streamlit as st
 import openai
 
@@ -12,7 +14,7 @@ import openai
 openai_client = openai.OpenAI(api_key=st.secrets.get('OPENAI_KEY', ''))
 
 
-HIDDEN_PAGES = {1, 2}
+HIDDEN_PAGES = {1}
 
 
 def _compute_target_page(current_page: int, direction: str) -> int:
@@ -101,7 +103,7 @@ def display_pr_context(pr_url=None, issue_url=None):
     """
     if pr_url or issue_url:
         st.info(f"""
-        **PR:** {pr_url or 'N/A'}
+        **PR URL:** {pr_url or 'N/A'}
         """)
         st.markdown("<div style='margin-bottom: 1rem;'></div>", unsafe_allow_html=True)
 
@@ -191,3 +193,23 @@ def record_audio(question_key, min_duration=20, max_duration=600):
         return edited_transcript
     
     return None
+
+
+def extract_repo_url(pr_url: str) -> str:
+    """Extract the base repository URL from a GitHub pull request URL."""
+    if pr_url is None:
+        raise ValueError("PR URL is required to extract repository URL")
+
+    if isinstance(pr_url, bytes):
+        pr_url = pr_url.decode('utf-8', errors='ignore')
+    else:
+        pr_url = str(pr_url)
+
+    parsed = urlparse(pr_url)
+    path_parts = parsed.path.strip('/').split('/')
+    if len(path_parts) < 2:
+        raise ValueError("Invalid GitHub PR URL format")
+    owner, repo = path_parts[0], path_parts[1]
+    scheme = parsed.scheme or 'https'
+    netloc = parsed.netloc or 'github.com'
+    return f"{scheme}://{netloc}/{owner}/{repo}"

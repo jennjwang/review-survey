@@ -9,6 +9,7 @@ from styles import SURVEY_STYLES
 from pages import (
     # Pre-study pages
     participant_id_page,
+    setup_checklist_page,
     pr_assignment_page,
 
     # Post-PR-Review pages
@@ -73,6 +74,7 @@ def main():
     page_routes = {
         # Pre-study section
         0: participant_id_page,             # Participant ID entry
+        2: setup_checklist_page,            # Setup checklist
         3: pr_assignment_page,              # PR assignment
         4: review_submission_page,          # Confirm first review submitted
 

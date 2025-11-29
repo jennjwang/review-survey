@@ -4,3 +4,5 @@ __pycache__/
 .specstory/
 .cursorindexingignore
 *.pyc
+.env
+google_auth.json

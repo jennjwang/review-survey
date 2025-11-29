@@ -8,6 +8,7 @@ import streamlit as st
 from survey_components import page_header, selectbox_question, navigation_buttons
 from survey_utils import save_and_navigate, display_pr_context
 from survey_data import get_repository_assignment, get_assigned_pr_for_reviewer, save_session_state, update_is_reviewed_for_issue
+from drive_upload import upload_to_drive_in_subfolders, sanitize_filename
 
 
 def review_submission_page():
@@ -47,33 +48,97 @@ def review_submission_page():
     **PR:** {pr_url if pr_url else 'N/A'}
     """)
 
+    st.markdown(
+        "<p style='font-size:16px; margin-top: 1rem; margin-bottom: 1rem;'>"
+        "<b>Important:</b> Remember to keep swe-prod-recorder running while you review the PR.</p>",
+        unsafe_allow_html=True
+    )
+
     st.markdown("<hr style='margin: 2rem 0;'>", unsafe_allow_html=True)
 
     # Main question section
     st.markdown("### Have you completed your initial review?")
-    st.markdown("<div style='margin-bottom: 1rem;'></div>", unsafe_allow_html=True)
+    # st.markdown("<div style='margin-bottom: 1rem;'></div>", unsafe_allow_html=True)
 
-    st.markdown("Please confirm that you have:")
-    st.markdown("""
-    - Reviewed the PR thoroughly
-    - Provided feedback on the code
-    """)
+    st.markdown("Please confirm that you have reviewed the PR thoroughly and provided feedback on the code.")
 
-    st.markdown("<div style='margin-bottom: 1.5rem;'></div>", unsafe_allow_html=True)
+    # st.markdown("<div style='margin-bottom: 1.5rem;'></div>", unsafe_allow_html=True)
 
-    # Get previous selection
-    previous = st.session_state['survey_responses'].get('is_reviewed', None)
+    # Store completion choice in session state to show/hide upload section
+    if 'review_completion_choice' not in st.session_state:
+        st.session_state['review_completion_choice'] = None
 
     # Create two-column layout for buttons
     col1, col2 = st.columns(2)
 
     with col1:
         if st.button("Yes, I've completed my review", key="review_yes", use_container_width=True, type="primary"):
+            st.session_state['review_completion_choice'] = 'completed'
+
+    with col2:
+        if st.button("Not yet, still working on it", key="review_no", use_container_width=True):
+            st.session_state['review_completion_choice'] = 'not_completed'
+
+    # If user selected "completed", show file upload section
+    if st.session_state.get('review_completion_choice') == 'completed':
+        st.divider()
+        st.subheader("Upload Screen Recorder Data")
+        st.write("Please review your data to exclude any sensitive information before submitting.")
+
+        st.caption("Upload a zipped copy of the `/data` folder from your swe-prod-recorder directory.")
+        screenrec_upload = st.file_uploader(
+            "Upload screen recorder /data folder (zipped)",
+            type=['zip'],
+            key="screenrec_upload",
+            label_visibility="collapsed"
+        )
+        st.markdown("<div style='margin-bottom: 1rem;'></div>", unsafe_allow_html=True)
+
+        submit_button = st.button(
+            "Submit and Continue",
+            key="submit_review_completion",
+            type="primary"
+        )
+
+        if submit_button:
+            # Enforce upload present
+            if not screenrec_upload:
+                st.error("Please upload the screen recorder data zip before submitting.")
+                return
+
+            # Upload files to Drive
+            try:
+                folder_id = (
+                    st.secrets.get('REVIEWER_GDRIVE_FOLDER_ID') or
+                    st.secrets.get('GDRIVE_FOLDER_ID')
+                )
+                if not folder_id:
+                    st.error("Drive folder not configured. Ask the study team to set REVIEWER_GDRIVE_FOLDER_ID in secrets.")
+                    return
+
+                with st.spinner('Uploading your file...'):
+                    participant_folder = sanitize_filename(participant_id) if participant_id else "unknown_participant"
+                    issue_folder = sanitize_filename(f"pr_{issue_id}") if issue_id else "unknown_pr"
+                    review_status = "initial_review"
+                    subfolders = [participant_folder, issue_folder, review_status]
+
+                    # Upload screen recorder zip
+                    upload_to_drive_in_subfolders(
+                        screenrec_upload,
+                        folder_id,
+                        subfolders=subfolders,
+                        filename=screenrec_upload.name,
+                    )
+                st.success("Upload completed successfully!")
+            except Exception as e:
+                st.error(f"Upload failed: {e}")
+                return
+
             # Save response
             st.session_state['survey_responses']['is_reviewed'] = "Yes - I've submitted my review"
+            st.session_state['survey_responses']['artifacts_uploaded'] = True
 
             # Update is_reviewed flag in database
-            issue_id = st.session_state['survey_responses'].get('issue_id')
             print(f"[DEBUG] Updating is_reviewed for issue_id={issue_id}")
             if issue_id:
                 result = update_is_reviewed_for_issue(issue_id, True)
@@ -86,14 +151,18 @@ def review_submission_page():
 
             # Navigate to next page
             next_index = 5  # pr_status_page index
-            participant = st.session_state['survey_responses'].get('participant_id')
-            if participant:
-                save_session_state(participant, next_index, st.session_state['survey_responses'])
+            if participant_id:
+                save_session_state(participant_id, next_index, st.session_state['survey_responses'])
             st.session_state['page'] = next_index
+            st.session_state['review_completion_choice'] = None  # Reset for next time
             st.rerun()
 
-    with col2:
-        if st.button("Not yet, still working on it", key="review_no", use_container_width=True):
-            st.session_state['survey_responses']['is_reviewed'] = "Not yet"
-            st.info("Please complete your initial review before proceeding.")
+    # If user selected "not completed", show helpful message
+    if st.session_state.get('review_completion_choice') == 'not_completed':
+        st.divider()
+        st.info("""
+            No problem! Please continue working on your review.
 
+            When you complete it and submit your review, return to this page to confirm completion.
+        """)
+        st.session_state['survey_responses']['is_reviewed'] = "Not yet"

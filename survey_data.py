@@ -7,7 +7,7 @@ from supabase import create_client
 from contributor_config import get_contributor_db_creds, CONTRIBUTOR_TABLES
 from survey_questions import NASA_TLX_QUESTIONS, CODE_QUALITY_QUESTIONS
 
-MIN_COMPLETED_REVIEWS = 2
+MIN_COMPLETED_REVIEWS = 4
 
 
 # Initialize Supabase client for reviewer data
@@ -998,6 +998,7 @@ def determine_current_page(participant_id: str, survey_responses: dict = None):
 
     Page mapping (new flow):
         0: participant_id_page - Participant ID entry
+        2: setup_checklist_page - Reviewer setup checklist
         3: pr_assignment_page - PR assignment and time estimates
         4: review_submission_page - Confirm first review submitted
         5: nasa_tlx_questions_page - NASA-TLX workload questions
@@ -1019,6 +1020,21 @@ def determine_current_page(participant_id: str, survey_responses: dict = None):
             return 0  # No valid repository assignment
 
         assigned_repo = repo_result['repository']
+
+        # Require setup checklist completion before proceeding to PR assignment
+        # BUT skip checklist requirement if they've already completed a review
+        setup_complete = False
+        if isinstance(survey_responses, dict):
+            setup_complete = survey_responses.get('setup_checklist_complete', False)
+
+        # Check if they've already started reviewing (completed at least one review)
+        progress_result = get_participant_progress(participant_id)
+        has_started_reviews = False
+        if progress_result.get('success') and progress_result.get('progress'):
+            has_started_reviews = progress_result['progress'].get('post_pr_review_count', 0) > 0
+
+        if not setup_complete and not has_started_reviews:
+            return 2
 
         # Check if PR is assigned and if estimates are provided
         pr_result = get_assigned_pr_for_reviewer(participant_id, assigned_repo)
@@ -1065,7 +1081,6 @@ def determine_current_page(participant_id: str, survey_responses: dict = None):
         all_reviewed_prs_closed = (
             closed_pr_reviews >= completed_pr_reviews and completed_pr_reviews > 0
         )
-        initial_review_quota_met = completed_pr_reviews >= MIN_COMPLETED_REVIEWS
 
         def normalize_url(url: str) -> str:
             if not url:
@@ -1131,6 +1146,9 @@ def determine_current_page(participant_id: str, survey_responses: dict = None):
         shared_sources = collect_sources(current_post_pr_entry, pr_data, session_assigned_pr, session_responses)
 
         review_quota_met = completed_pr_reviews >= MIN_COMPLETED_REVIEWS
+        artifact_status_map = session_responses.get('artifact_upload_status', {}) if isinstance(session_responses, dict) else {}
+        issue_key = str(pr_data.get('issue_id') or pr_data.get('url') or 'current_pr')
+        artifact_complete = artifact_status_map.get(issue_key, False)
 
         # Check NASA TLX completion directly from database
         nasa_complete = check_nasa_tlx_completed(participant_id, current_pr_url)
@@ -1150,18 +1168,21 @@ def determine_current_page(participant_id: str, survey_responses: dict = None):
         if not ai_detection_complete:
             return 7  # AI detection questions incomplete
 
-        if initial_review_quota_met and not review_quota_met:
+        if review_quota_met:
             print(
-                f"[DEBUG] Initial review quota met ({completed_pr_reviews}/{MIN_COMPLETED_REVIEWS}). Proceeding to end-of-study."
+                f"[DEBUG] Reviewer quota met ({completed_pr_reviews}/{MIN_COMPLETED_REVIEWS}). Proceeding to end-of-study checks."
             )
             if not all_reviewed_prs_closed:
                 print(
                     f"[DEBUG] Reviewer still has open PRs ({closed_pr_reviews}/{completed_pr_reviews}). Redirecting to PR status page."
                 )
                 return 8
+            if not artifact_complete:
+                print(f"[DEBUG] Awaiting artifact uploads for issue_key={issue_key}.")
+                return 11
             if not progress.get('end_study_completed'):
-                return 11  # Go directly to study validation
-            return 12  # Completion page once validation done
+                return 12  # Go directly to study validation
+            return 13  # Completion page once validation done
 
         # After post-PR review questions, go to PR status page
         # Check if PR is closed/merged
@@ -1172,6 +1193,10 @@ def determine_current_page(participant_id: str, survey_responses: dict = None):
         if progress.get('post_pr_closed_count', 0) == 0:
             return 9  # PR closed but no post-PR closed data, go to collaboration questions
 
+        if not artifact_complete:
+            print(f"[DEBUG] Awaiting artifact uploads for issue_key={issue_key}.")
+            return 11
+
         # Ensure minimum number of PR reviews before end-of-study
         if completed_pr_reviews < MIN_COMPLETED_REVIEWS:
             print(
@@ -1181,7 +1206,7 @@ def determine_current_page(participant_id: str, survey_responses: dict = None):
 
         # Check end-study completion
         if not progress.get('end_study_completed'):
-            return 11  # Post-PR closed complete, go to study validation
+            return 12  # Post-PR closed complete, go to study validation
 
         if closed_pr_reviews < completed_pr_reviews:
             print(
@@ -1189,7 +1214,7 @@ def determine_current_page(participant_id: str, survey_responses: dict = None):
             )
             return 8
 
-        return 12  # Go to completion page
+        return 13  # Go to completion page
 
     except Exception as e:
         print(f"Error determining current page: {e}")

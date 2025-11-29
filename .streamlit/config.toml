@@ -7,3 +7,4 @@ font = "sans serif"
 
 [server]
 fileWatcherType = "poll"
+maxUploadSize = 10000  # 10 GB limit for data submission uploads

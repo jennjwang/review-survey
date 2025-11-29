@@ -6,6 +6,7 @@ Organized into logical sections: pre-study, post-pr-review, post-pr-closed, and 
 # Import from organized sections
 from .pre_study import (
     participant_id_page,
+    setup_checklist_page,
     pr_assignment_page
 )
 
@@ -30,6 +31,7 @@ from .end_study import (
 __all__ = [
     # Pre-study pages
     'participant_id_page',
+    'setup_checklist_page',
     'pr_assignment_page',
     
     # Post-PR-Review pages

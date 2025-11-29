@@ -6,18 +6,18 @@ import streamlit as st
 from survey_components import page_header, selectbox_question, navigation_buttons
 from survey_utils import save_and_navigate
 from survey_data import (
-    get_repository_assignment, 
-    list_assigned_prs_for_reviewer, 
+    get_repository_assignment,
+    list_assigned_prs_for_reviewer,
     update_contributor_repo_issues_status,
     get_random_unassigned_pr,
     assign_pr_to_reviewer,
     get_participant_progress,
     MIN_COMPLETED_REVIEWS
 )
+from drive_upload import upload_to_drive_in_subfolders, sanitize_filename
 
 
 STATUS_OPTIONS = [
-    "Not selected",
     "Still open - review in progress",
     "Merged - PR was accepted and merged",
     "Closed without merging - PR was rejected or abandoned"
@@ -31,8 +31,8 @@ def pr_status_page():
         <p style='font-size:18px; font-weight: 400; margin-bottom: 2rem'>
         Thank you for reviewing the PR! <br><br>
         Please update the status of your assigned PR below once it has been merged or closed. 
-        If you would like to review another PR, you can request one below.
-        </p>
+        If you would like to review another PR, you can request one below. <br><br>
+        <b>Important:</b> Remember to keep swe-prod-recorder running while you review and discuss the PR.
         """, unsafe_allow_html=True)
 
     participant_id = st.session_state['survey_responses'].get('participant_id')
@@ -87,7 +87,11 @@ def pr_status_page():
                             st.session_state['survey_responses']['issue_url'] = pr_data['issue_url']
                             st.session_state['survey_responses']['issue_id'] = pr_data['issue_id']
                             st.session_state['survey_responses']['reviewer_estimate'] = 'Not selected'
-                            st.session_state['survey_responses']['pr_status'] = 'Not selected'
+                            st.session_state['survey_responses']['pr_status'] = 'Still open - review in progress'
+                            artifact_map = st.session_state['survey_responses'].setdefault('artifact_upload_status', {})
+                            if pr_data.get('issue_id') is not None:
+                                artifact_map[str(pr_data['issue_id'])] = False
+                            st.session_state['survey_responses']['artifact_upload_complete'] = False
                             st.session_state['page'] = 4  # review_submission_page
                             st.rerun()
                         else:
@@ -96,47 +100,62 @@ def pr_status_page():
                         return f"⚠️ {pr_result.get('error') or 'No unassigned PRs available in this repo.'}"
         return None
 
+    st.markdown("<div style='margin-bottom: 1.5rem;'></div>", unsafe_allow_html=True)
+
     if not pr_choices:
-        st.info("All of your reviewed PRs have been merged or closed.")
+        st.info("All of your reviewed PRs have been merged or closed. Please request another PR.")
         st.markdown("<div style='margin-top: 1rem;'></div>", unsafe_allow_html=True)
-        if st.button("Request another PR", key="assign_another_pr_empty", use_container_width=True):
-            assignment_error = request_another_pr("assign_another_pr_empty_click")
-            if assignment_error:
-                st.error(assignment_error)
+        assignment_error = request_another_pr("assign_another_pr_empty")
+        if assignment_error:
+            st.error(assignment_error)
         return
+
+    st.divider()
 
     labels = [f"PR #{p['number']}: {p['url']}" if p['number'] != 'N/A' else p['title'] for p in pr_choices]
 
+    st.subheader("Update PR Status")
     st.markdown(
-        "<p style='font-size:18px; font-weight: 400; margin-bottom:0.5rem;'>Select a PR</p>", 
+        "<p style='font-size:18px; font-weight: 400; margin-bottom:0.5rem;'>Select a PR:</p>",
         unsafe_allow_html=True
     )
     selected_label = st.selectbox("", labels, index=0, label_visibility="collapsed")
+
+    st.markdown("<div style='margin-top: 1rem;'></div>", unsafe_allow_html=True)
 
     idx = labels.index(selected_label)
     pr = pr_choices[idx]
     pr_url = pr['url']
     st.session_state['survey_responses']['pr_url'] = pr_url
     st.session_state['survey_responses']['issue_id'] = pr.get('issue_id')
+    artifact_map = st.session_state['survey_responses'].setdefault('artifact_upload_status', {})
+    if pr.get('issue_id') is not None:
+        issue_key = str(pr['issue_id'])
+    else:
+        issue_key = pr_url or 'current_pr'
+    st.session_state['survey_responses']['artifact_upload_complete'] = artifact_map.get(issue_key, False)
 
     if pr_url:
         st.info(f"**Link to PR:** [{pr_url}]({pr_url})")
     else:
         st.warning("⚠️ No PR assigned yet.")
 
-    st.divider()
+    st.markdown("<div style='margin: 1.5rem 0;'></div>", unsafe_allow_html=True)
 
-    previous_value = st.session_state['survey_responses'].get('pr_status', 'Not selected')
+    # Set default PR status if not already set
+    if 'pr_status' not in st.session_state['survey_responses']:
+        st.session_state['survey_responses']['pr_status'] = 'Still open - review in progress'
+
+    previous_value = st.session_state['survey_responses']['pr_status']
 
     pr_status = selectbox_question(
         "What is the current status of this PR?",
         STATUS_OPTIONS,
         "pr_status",
-        previous_value,
-        placeholder="Select the PR status"
+        previous_value
     )
-    
-    st.markdown("")
+
+    st.markdown("<div style='margin-top: 1rem;'></div>", unsafe_allow_html=True)
 
     # Show info box if PR is still in progress
     if pr_status == "Still open - review in progress":
@@ -144,47 +163,75 @@ def pr_status_page():
         - Please continue collaborating with the contributor until the PR is ready to merge.
         - If there's no response for 2+ weeks, you may close the PR as abandoned.
         - Return here to update the status once the PR is merged or closed.""")
+        st.markdown("<div style='margin-top: 5rem;'></div>", unsafe_allow_html=True)
 
-    def validate():
-        return pr_status != "Not selected"
+    # Show upload section if PR is merged or closed
+    if pr_status in ["Merged - PR was accepted and merged", "Closed without merging - PR was rejected or abandoned"]:
+        st.divider()
+        st.subheader("Upload Screen Recorder Data")
+        st.write("Please review your data to exclude any sensitive information before submitting.")
 
-    def handle_next():
-        if not validate():
-            return
-        st.session_state['survey_responses']['pr_status'] = pr_status
+        st.caption("Upload a zipped copy of the `/data` folder from your swe-prod-recorder directory for this PR review.")
+        screenrec_upload = st.file_uploader(
+            "Upload screen recorder /data folder (zipped)",
+            type=['zip'],
+            key="screenrec_upload_closed",
+            label_visibility="collapsed"
+        )
+
+        st.markdown("<div style='margin-top: 1.5rem;'></div>", unsafe_allow_html=True)
+
+        submit_button = st.button(
+            "Submit and Continue",
+            key="submit_pr_closed",
+            type="primary"
+        )
         
-        # Update is_merged/is_closed in the contributor database
-        issue_id = st.session_state['survey_responses'].get('issue_id')
-        if issue_id:
-            is_merged = pr_status == "Merged - PR was accepted and merged"
-            is_closed = pr_status == "Closed without merging - PR was rejected or abandoned"
-            if is_merged or is_closed:
+
+        if submit_button:
+            # Enforce upload present
+            if not screenrec_upload:
+                st.error("Please upload the screen recorder data zip before submitting.")
+                return
+
+            # Upload file to Drive
+            try:
+                folder_id = (
+                    st.secrets.get('REVIEWER_GDRIVE_FOLDER_ID') or
+                    st.secrets.get('GDRIVE_FOLDER_ID')
+                )
+                if not folder_id:
+                    st.error("Drive folder not configured. Ask the study team to set REVIEWER_GDRIVE_FOLDER_ID in secrets.")
+                    return
+
+                with st.spinner('Uploading your file...'):
+                    participant_folder = sanitize_filename(participant_id) if participant_id else "unknown_participant"
+                    current_issue_id = st.session_state['survey_responses'].get('issue_id')
+                    issue_folder = sanitize_filename(f"pr_{current_issue_id}_closed") if current_issue_id else "unknown_pr_closed"
+                    review_status = "final_review"
+                    subfolders = [participant_folder, issue_folder, review_status]
+
+                    # Upload screen recorder zip
+                    upload_to_drive_in_subfolders(
+                        screenrec_upload,
+                        folder_id,
+                        subfolders=subfolders,
+                        filename=screenrec_upload.name,
+                    )
+                st.success("Upload completed successfully!")
+            except Exception as e:
+                st.error(f"Upload failed: {e}")
+                return
+
+            # Update PR status in database
+            st.session_state['survey_responses']['pr_status'] = pr_status
+            issue_id = st.session_state['survey_responses'].get('issue_id')
+            if issue_id:
+                is_merged = pr_status == "Merged - PR was accepted and merged"
+                is_closed = pr_status == "Closed without merging - PR was rejected or abandoned"
                 result = update_contributor_repo_issues_status(issue_id, is_closed, is_merged, True)
                 if not result['success']:
                     st.warning(f"Error updating PR status: {result['error']}")
-        
-        # If PR is closed or merged, proceed to post-PR-closed questions
-        if pr_status in ["Merged - PR was accepted and merged", "Closed without merging - PR was rejected or abandoned"]:
+
+            # Navigate to next page
             save_and_navigate('next', pr_status=pr_status)
-        else:
-            # PR still open - stay on this page
-            st.session_state['survey_responses']['pr_status'] = pr_status
-
-    # Actions row: Assign another PR (left), Continue (right)
-    st.markdown("<div style='margin-top: 1rem;'></div>", unsafe_allow_html=True)
-    
-    assignment_error = None
-
-    col_assign, col_spacer, col_continue = st.columns([4, 2.5, 1.5])
-    
-    with col_assign:
-        assignment_error = request_another_pr("assign_another_pr")
-
-    with col_continue:
-        if pr_status in ["Merged - PR was accepted and merged", "Closed without merging - PR was rejected or abandoned"]:
-            if st.button("Continue", key="pr_status_next", type="primary", use_container_width=True):
-                handle_next()
-    
-    # Display assignment error outside columns for full width
-    if assignment_error:
-        st.error(assignment_error)

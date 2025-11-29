@@ -14,6 +14,19 @@ from survey_data import (
 )
 
 
+def _sync_artifact_status(issue_id, status=None):
+    responses = st.session_state['survey_responses']
+    artifact_map = responses.setdefault('artifact_upload_status', {})
+    if issue_id is None:
+        responses['artifact_upload_complete'] = False
+        return
+    key = str(issue_id)
+    if status is None:
+        status = artifact_map.get(key, False)
+    artifact_map[key] = status
+    responses['artifact_upload_complete'] = status
+
+
 def pr_assignment_page():
     """Display the PR assignment page."""
     page_header(
@@ -39,7 +52,7 @@ def pr_assignment_page():
                 st.warning("⚠️ Could not load your repository assignment; please go back and re-enter your Participant ID.")
         except Exception:
             st.warning("⚠️ Could not load your repository assignment; please go back and re-enter your Participant ID.")
-    
+
     # Check if PR is already in session or fetch from repo-issues by reviewer_id
     no_pr_available = False
     current_pr = st.session_state['survey_responses'].get('assigned_pr', None)
@@ -54,6 +67,7 @@ def pr_assignment_page():
             st.session_state['survey_responses']['issue_id'] = pr_data['issue_id']
             st.session_state['survey_responses']['issue_url'] = pr_data['issue_url']
             current_pr = pr_data
+            _sync_artifact_status(pr_data.get('issue_id'))
 
             # Check if estimates have already been provided
             reviewer_estimate_db = pr_data.get('reviewer_estimate')
@@ -82,6 +96,8 @@ def pr_assignment_page():
                     st.session_state['survey_responses']['issue_id'] = pr_data['issue_id']
                     st.session_state['survey_responses']['issue_url'] = pr_data['issue_url']
                     
+                    _sync_artifact_status(pr_data.get('issue_id'), status=False)
+
                     current_pr = pr_data
                     st.success(f"✅ Successfully assigned PR #{pr_data['number']}")
                     st.rerun()
@@ -104,8 +120,8 @@ def pr_assignment_page():
     # Display PR assignment
     if current_pr:
         st.info(f"""
-        **Issue:** {current_pr.get('issue_url', 'N/A')}\n
-        **PR:** {current_pr.get('url', 'N/A')}
+        **Issue URL:** {current_pr.get('issue_url', 'N/A')}\n
+        **PR URL:** {current_pr.get('url', 'N/A')}
         """)
         st.markdown("<div style='margin-bottom: 1.5rem;'></div>", unsafe_allow_html=True)
     elif not participant_id or not assigned_repo or assigned_repo == 'N/A':
@@ -163,11 +179,11 @@ def pr_assignment_page():
             </p>
             <p style='font-size:18px'>
             1. Assign the PR to yourself<br>
-            2. Review the assigned PR thoroughly<br>
-            3. Complete the post-PR review survey<br>
-            4. Engage in discussion with the contributor<br>
+            2. Review the assigned PR thoroughly - make sure to use the recording tool to capture your review session<br>
+            3. Complete a short survey after your initial review of the PR<br>
+            4. Engage in discussion with the contributor - make sure to use the recording tool to capture this session<br>
             5. Close or merge the PR as appropriate<br>
-            6. Complete the post-PR closed survey
+            6. Complete the final survey reflecting on your review experience
             </p>
             """, unsafe_allow_html=True)
 
