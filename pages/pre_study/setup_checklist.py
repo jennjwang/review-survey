@@ -5,7 +5,7 @@ Reviewer setup checklist page.
 import streamlit as st
 from survey_components import page_header, navigation_buttons
 from survey_utils import save_and_navigate, extract_repo_url
-from survey_data import get_repository_assignment, get_participant_progress
+from survey_data import get_repository_assignment, get_participant_progress, list_assigned_prs_for_reviewer
 
 
 CHECKLIST_KEYS = {
@@ -19,12 +19,23 @@ def setup_checklist_page():
     responses = st.session_state['survey_responses']
     participant_id = responses.get('participant_id')
 
-    # Check if reviewer has already started (has completed at least one review)
+    # Check if reviewer has already started (has completed at least one review OR has an assigned PR)
     if participant_id:
         progress_result = get_participant_progress(participant_id)
         if progress_result.get('success') and progress_result.get('progress'):
             # If they already have completed a review, skip the checklist
             if progress_result['progress'].get('post_pr_review_count', 0) > 0:
+                st.session_state['page'] += 1
+                st.rerun()
+                return
+
+        # Also check if they have any assigned PRs
+        repo_result = get_repository_assignment(participant_id)
+        if repo_result.get('success') and repo_result.get('repository'):
+            assigned_repo = repo_result['repository']
+            prs_result = list_assigned_prs_for_reviewer(participant_id, assigned_repo)
+            if prs_result.get('success') and prs_result.get('prs') and len(prs_result['prs']) > 0:
+                # They have at least one assigned PR, skip the checklist
                 st.session_state['page'] += 1
                 st.rerun()
                 return

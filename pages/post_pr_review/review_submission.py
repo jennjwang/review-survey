@@ -60,7 +60,7 @@ def review_submission_page():
     st.markdown("### Have you completed your initial review?")
     # st.markdown("<div style='margin-bottom: 1rem;'></div>", unsafe_allow_html=True)
 
-    st.markdown("Please confirm that you have reviewed the PR thoroughly and provided feedback on the code.")
+    st.markdown("Please confirm that you have reviewed the PR thoroughly and provided feedback.")
 
     # st.markdown("<div style='margin-bottom: 1.5rem;'></div>", unsafe_allow_html=True)
 
