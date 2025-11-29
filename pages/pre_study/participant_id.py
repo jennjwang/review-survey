@@ -1,88 +1,80 @@
 """
-Review email page for the reviewer survey.
+Participant ID page for the reviewer survey.
 """
 
 import streamlit as st
-from survey_components import page_header, text_input_question, navigation_buttons
-from survey_utils import save_and_navigate
-from survey_data import validate_participant_id, get_repository_assignment, determine_current_page
+from survey_components import page_header, text_input_question
+from survey_data import validate_participant_id, get_participant_progress, get_repository_assignment
 
 
 def participant_id_page():
-    """Display the email page."""
+    """Display the participant ID input page."""
     page_header(
-        "Reviewer Information"
+        "The Ripple Effects of AI in Software Development",
+        "Please enter your email to begin the survey."
     )
-    
-    # Load previous response if exists
+
+    # Load previous participant ID if it exists
     previous_participant_id = st.session_state['survey_responses'].get('participant_id', '')
-    
-    # email input
+
+    # Participant ID input
     participant_id = text_input_question(
-        "Please enter your email to begin the survey:",
-        "participant_id",
+        "Email:",
+        "participant_id_input",
         previous_participant_id,
         placeholder="Enter your email"
     )
-    
-    # Show repository assignment if email is valid
-    assigned_repo = None
-    if participant_id and participant_id.strip():
-        try:
-            # Validate email
-            validation_result = validate_participant_id(participant_id)
-            
+
+    # Navigation - hide back button since this is the first page
+    st.markdown("<div style='margin-top: 2rem;'></div>", unsafe_allow_html=True)
+    next_clicked = st.button("Next", key="participant_id_next")
+
+    if next_clicked:
+        # Basic validation first
+        if not participant_id or not participant_id.strip():
+            st.error("Please enter your email to proceed.")
+        else:
+            # Validate against database
+            with st.spinner('Validating email...'):
+                validation_result = validate_participant_id(participant_id)
+
             if validation_result['valid']:
-                # st.success(f"email '{participant_id}' validated successfully!")
-                # Persist participant_id immediately so downstream pages can use it
+                # ID is valid, save it
                 st.session_state['survey_responses']['participant_id'] = participant_id
 
-                # Determine the correct page based on completion status
-                correct_page = determine_current_page(participant_id, st.session_state['survey_responses'])
-                if correct_page > 0:
-                    st.session_state['page'] = correct_page
-                    st.rerun()
-
                 # Get repository assignment
-                repo_result = get_repository_assignment(participant_id)
-                
+                with st.spinner('Loading your assignment...'):
+                    repo_result = get_repository_assignment(participant_id)
+
                 if repo_result['success']:
                     assigned_repo = repo_result['repository']
                     repository_url = repo_result['url']
                     st.session_state['survey_responses']['assigned_repository'] = assigned_repo
                     st.session_state['survey_responses']['repository_url'] = repository_url
-                    st.info(f"**Assigned Repository:** {assigned_repo}")
+
+                # Check progress to see if they should skip ahead
+                with st.spinner('Checking your progress...'):
+                    progress_result = get_participant_progress(participant_id)
+
+                if progress_result['success']:
+                    progress = progress_result['progress']
+
+                    # Check if they have started reviews
+                    has_started_reviews = progress.get('post_pr_review_count', 0) > 0
+
+                    if has_started_reviews:
+                        # They've started, route to PR status page
+                        st.info("Welcome back! You've already started reviewing.")
+                        st.session_state['page'] = 8  # pr_status_page
+                        st.rerun()
+                    else:
+                        # New reviewer, proceed to next page
+                        st.session_state['page'] = 2  # setup_checklist_page
+                        st.rerun()
                 else:
-                    st.error(f"⚠️ {repo_result['error']}")
-                    assigned_repo = None
-                    # Clear any stale assignment from session state
-                    st.session_state['survey_responses'].pop('assigned_repository', None)
-                    st.session_state['survey_responses'].pop('repository_url', None)
+                    # Couldn't check progress, just proceed normally
+                    st.session_state['page'] = 2  # setup_checklist_page
+                    st.rerun()
             else:
-                st.error(f"⚠️ {validation_result['error']}")
-                assigned_repo = None
-                # Clear any stale assignment from session state
-                st.session_state['survey_responses'].pop('assigned_repository', None)
-                st.session_state['survey_responses'].pop('repository_url', None)
-        except Exception as e:
-            st.error(f"Error validating email: {str(e)}")
-            assigned_repo = None
-            # Clear any stale assignment from session state
-            st.session_state['survey_responses'].pop('assigned_repository', None)
-            st.session_state['survey_responses'].pop('repository_url', None)
-    
-    # Validation function
-    def validate():
-        # Only allow Next if the current validation flow assigned a repository
-        return participant_id and participant_id.strip() != "" and assigned_repo is not None
-    
-    # Navigation
-    navigation_buttons(
-        on_back=lambda: save_and_navigate('back', participant_id=participant_id),
-        on_next=lambda: save_and_navigate('next', participant_id=participant_id),
-        back_key="participant_id_back",
-        next_key="participant_id_next",
-        show_back=False,
-        validation_fn=validate,
-        validation_error="Please enter a valid email before proceeding."
-    )
+                # ID is not valid, show error
+                st.error(f"{validation_result['error']}")

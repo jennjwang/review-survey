@@ -207,7 +207,7 @@ def pr_status_page():
                 with st.spinner('Uploading your file...'):
                     participant_folder = sanitize_filename(participant_id) if participant_id else "unknown_participant"
                     current_issue_id = st.session_state['survey_responses'].get('issue_id')
-                    issue_folder = sanitize_filename(f"pr_{current_issue_id}_closed") if current_issue_id else "unknown_pr_closed"
+                    issue_folder = sanitize_filename(f"pr_{current_issue_id}") if current_issue_id else "unknown_pr"
                     review_status = "final_review"
                     subfolders = [participant_folder, issue_folder, review_status]
 
