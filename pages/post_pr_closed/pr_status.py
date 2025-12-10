@@ -109,6 +109,10 @@ def pr_status_page():
         if assignment_error:
             st.error(assignment_error)
         return
+    else:
+        assignment_error = request_another_pr("assign_another_pr_not_empty")
+        if assignment_error:
+            st.error(assignment_error)
 
     st.divider()
 
