@@ -92,7 +92,8 @@ def pr_status_page():
                             if pr_data.get('issue_id') is not None:
                                 artifact_map[str(pr_data['issue_id'])] = False
                             st.session_state['survey_responses']['artifact_upload_complete'] = False
-                            st.session_state['page'] = 4  # review_submission_page
+                            # Send the reviewer back to the estimate + assignment step for the new PR
+                            st.session_state['page'] = 3  # pr_assignment_page
                             st.rerun()
                         else:
                             return f"Error assigning PR: {assign_result['error']}"

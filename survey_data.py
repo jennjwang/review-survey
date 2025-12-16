@@ -676,12 +676,25 @@ def get_assigned_pr_for_reviewer(reviewer_id: str, repository: str):
             'repository, issue_url, issue_id, repository_id, pr_url, reviewer_assigned, reviewer_id, '
             'reviewer_estimate, new_contributor_estimate, reviewer_assigned_on, is_closed, is_merged, is_reviewed, '
             'using_ai, issue_sequence'
-        ).eq('repository', repo_name).eq('reviewer_id', reviewer_id).eq('reviewer_assigned', True).limit(1).execute()
+        ).eq('repository', repo_name).eq('reviewer_id', reviewer_id).eq('reviewer_assigned', True).execute()
 
         if not response.data or len(response.data) == 0:
             return {'success': True, 'pr': None, 'error': None}
 
-        issue = response.data[0]
+        # Pick the most recent open assignment (fallback to the newest record if all are closed)
+        issues = response.data
+
+        def sort_key(record):
+            assigned_on = record.get('reviewer_assigned_on') or ''
+            seq = record.get('issue_sequence')
+            return (assigned_on, seq if seq is not None else -1)
+
+        sorted_issues = sorted(issues, key=sort_key, reverse=True)
+
+        def is_active(record):
+            return not record.get('is_closed') and not record.get('is_merged')
+
+        issue = next((record for record in sorted_issues if is_active(record)), sorted_issues[0])
         pr_url = issue.get('pr_url', '')
         issue_url = issue.get('issue_url', '')
         issue_id = issue.get('issue_id')
