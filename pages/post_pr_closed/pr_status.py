@@ -12,6 +12,7 @@ from survey_data import (
     get_random_unassigned_pr,
     assign_pr_to_reviewer,
     get_participant_progress,
+    get_prs_with_incomplete_responses,
     MIN_COMPLETED_REVIEWS
 )
 from drive_upload import upload_to_drive_in_subfolders, sanitize_filename
@@ -62,6 +63,66 @@ def pr_status_page():
             st.session_state['survey_responses']['assigned_repository'] = assigned_repo
             st.session_state['survey_responses']['repository_url'] = repo_result['url']
 
+    # Check for PRs with incomplete post-PR-review responses
+    incomplete_prs = []
+    if participant_id and assigned_repo:
+        incomplete_result = get_prs_with_incomplete_responses(participant_id, assigned_repo)
+        if incomplete_result['success']:
+            incomplete_prs = incomplete_result.get('incomplete_prs', [])
+    
+    # If there are incomplete responses, show warning and redirect option
+    if incomplete_prs:
+        st.warning(f"⚠️ You have {len(incomplete_prs)} PR(s) with incomplete survey responses. Please complete them before requesting a new PR.")
+        
+        for incomplete_pr in incomplete_prs:
+            pr_url_incomplete = incomplete_pr.get('pr_url', 'Unknown PR')
+            missing = incomplete_pr.get('missing_fields', [])
+            
+            col1, col2 = st.columns([3, 1], vertical_alignment="center")
+            with col1:
+                st.markdown("<p style='margin-top: 0.4rem;'></p>", unsafe_allow_html=True)
+                st.markdown(f"**{pr_url_incomplete}**")
+            with col2:
+                if st.button("Complete Survey", key=f"complete_{incomplete_pr.get('issue_id')}", use_container_width=True):
+                    # Set up session state for this PR and redirect to the appropriate page
+                    st.session_state['survey_responses']['pr_url'] = incomplete_pr.get('pr_url')
+                    st.session_state['survey_responses']['issue_url'] = incomplete_pr.get('issue_url')
+                    st.session_state['survey_responses']['issue_id'] = incomplete_pr.get('issue_id')
+                    
+                    # Clear widget state to ensure fresh input
+                    widget_keys_to_clear = [
+                        'ai_review_strategy_text', 'ai_reasoning_text', 'ai_likelihood',
+                        'nasa_tlx_mental_demand', 'nasa_tlx_physical_demand', 'nasa_tlx_frustration',
+                        'code_quality_readability', 'code_quality_analyzability',
+                        'code_quality_modifiability', 'code_quality_testability',
+                        'code_quality_stability', 'code_quality_correctness',
+                        'code_quality_compliance',
+                    ]
+                    for widget_key in widget_keys_to_clear:
+                        if widget_key in st.session_state:
+                            del st.session_state[widget_key]
+                    
+                    # Clear session state responses to force fresh input
+                    st.session_state['survey_responses']['nasa_tlx_responses'] = {}
+                    st.session_state['survey_responses']['code_quality_responses'] = {}
+                    st.session_state['survey_responses']['ai_likelihood'] = None
+                    st.session_state['survey_responses']['ai_reasoning'] = ''
+                    st.session_state['survey_responses']['ai_review_strategy'] = ''
+                    
+                    # Determine which page to go to based on missing fields
+                    if 'nasa_tlx' in missing:
+                        st.session_state['page'] = 5  # nasa_tlx_questions_page
+                    elif 'code_quality' in missing:
+                        st.session_state['page'] = 6  # code_quality_ratings_page
+                    elif 'ai_detection' in missing:
+                        st.session_state['page'] = 7  # ai_detection_page
+                    else:
+                        st.session_state['page'] = 5  # Default to NASA TLX
+                    
+                    st.rerun()
+        
+        st.divider()
+
     pr_url = st.session_state['survey_responses'].get('pr_url')
     
     pr_choices = []
@@ -75,7 +136,9 @@ def pr_status_page():
 
     def request_another_pr(button_key: str):
         if participant_id and assigned_repo:
-            if st.button("Request another PR", key=button_key, use_container_width=True):
+            # Disable button if there are incomplete responses
+            button_disabled = len(incomplete_prs) > 0
+            if st.button("Request another PR", key=button_key, use_container_width=True, disabled=button_disabled):
                 with st.spinner('Looking for another PR in this repository...'):
                     pr_result = get_random_unassigned_pr(assigned_repo)
                     if pr_result['success'] and pr_result['pr']:

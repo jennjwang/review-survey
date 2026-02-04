@@ -998,6 +998,115 @@ def check_ai_detection_completed(participant_id: str, pr_url: str):
         return False
 
 
+def get_prs_with_incomplete_responses(participant_id: str, repository: str):
+    """
+    Find PRs assigned to a reviewer that have incomplete post-PR-review responses.
+    A PR is considered incomplete if is_reviewed=True but missing required survey fields.
+    
+    Args:
+        participant_id: The reviewer's participant ID
+        repository: The repository name
+        
+    Returns:
+        dict with 'success', 'incomplete_prs' (list of PR dicts with missing fields), and 'error'
+    """
+    contributor_client = get_contributor_supabase_client()
+    if not contributor_client or not supabase_client:
+        return {
+            'success': False,
+            'error': 'Database client not initialized',
+            'incomplete_prs': []
+        }
+    
+    try:
+        # Get all PRs assigned to this reviewer that have been reviewed (is_reviewed=True)
+        response = contributor_client.table(CONTRIBUTOR_TABLES['repo_issues']).select(
+            'issue_id, pr_url, issue_url, is_reviewed, is_closed, is_merged'
+        ).eq('repository', repository).eq('reviewer_id', participant_id).eq('reviewer_assigned', True).eq('is_reviewed', True).execute()
+        
+        if not response.data:
+            return {'success': True, 'incomplete_prs': [], 'error': None}
+        
+        incomplete_prs = []
+        
+        for pr in response.data:
+            pr_url = pr.get('pr_url', '')
+            if not pr_url:
+                continue
+            
+            # Check if this PR has complete post-PR-review responses
+            normalized_url = pr_url.strip().rstrip('/')
+            
+            # Query the reviewer's post-PR-review table for this PR
+            review_response = supabase_client.table('reviewer-post-pr-review').select(
+                'pr_url, nasa_tlx_mental_demand, code_quality_readability, ai_likelihood, ai_reasoning, ai_review_strategy'
+            ).eq('participant_id', participant_id).execute()
+            
+            # Find matching entry by URL
+            matching_entry = None
+            if review_response.data:
+                for entry in review_response.data:
+                    entry_url = (entry.get('pr_url') or '').strip().rstrip('/')
+                    if entry_url == normalized_url:
+                        matching_entry = entry
+                        break
+            
+            # Check which fields are missing
+            missing_fields = []
+            
+            if not matching_entry:
+                missing_fields = ['nasa_tlx', 'code_quality', 'ai_detection']
+            else:
+                # Check NASA TLX
+                nasa_val = matching_entry.get('nasa_tlx_mental_demand')
+                if not nasa_val or (isinstance(nasa_val, str) and nasa_val.strip().lower() in ['', 'not selected']):
+                    missing_fields.append('nasa_tlx')
+                
+                # Check code quality
+                cq_val = matching_entry.get('code_quality_readability')
+                if not cq_val or (isinstance(cq_val, str) and cq_val.strip().lower() in ['', 'not selected']):
+                    missing_fields.append('code_quality')
+                
+                # Check AI detection
+                ai_likelihood = matching_entry.get('ai_likelihood')
+                ai_reasoning = matching_entry.get('ai_reasoning')
+                ai_strategy = matching_entry.get('ai_review_strategy')
+                
+                if not ai_likelihood or (isinstance(ai_likelihood, str) and ai_likelihood.strip().lower() in ['', 'not selected']):
+                    missing_fields.append('ai_detection')
+                elif not ai_reasoning or (isinstance(ai_reasoning, str) and ai_reasoning.strip() == ''):
+                    missing_fields.append('ai_detection')
+                elif not ai_strategy or (isinstance(ai_strategy, str) and ai_strategy.strip() == ''):
+                    missing_fields.append('ai_detection')
+            
+            if missing_fields:
+                incomplete_prs.append({
+                    'issue_id': pr.get('issue_id'),
+                    'pr_url': pr_url,
+                    'issue_url': pr.get('issue_url'),
+                    'is_closed': pr.get('is_closed'),
+                    'is_merged': pr.get('is_merged'),
+                    'missing_fields': missing_fields
+                })
+        
+        print(f"[INCOMPLETE CHECK] Found {len(incomplete_prs)} PRs with incomplete responses for {participant_id}")
+        return {
+            'success': True,
+            'incomplete_prs': incomplete_prs,
+            'error': None
+        }
+        
+    except Exception as e:
+        print(f"[INCOMPLETE CHECK] Error: {e}")
+        import traceback
+        traceback.print_exc()
+        return {
+            'success': False,
+            'error': str(e),
+            'incomplete_prs': []
+        }
+
+
 def determine_current_page(participant_id: str, survey_responses: dict = None):
     """
     Determine the appropriate page for a participant based on their completion status.
