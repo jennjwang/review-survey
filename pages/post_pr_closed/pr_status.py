@@ -87,11 +87,50 @@ def pr_status_page():
                             st.session_state['survey_responses']['issue_url'] = pr_data['issue_url']
                             st.session_state['survey_responses']['issue_id'] = pr_data['issue_id']
                             st.session_state['survey_responses']['reviewer_estimate'] = 'Not selected'
+                            st.session_state['survey_responses']['new_contributor_estimate'] = 'Not selected'
                             st.session_state['survey_responses']['pr_status'] = 'Still open - review in progress'
                             artifact_map = st.session_state['survey_responses'].setdefault('artifact_upload_status', {})
                             if pr_data.get('issue_id') is not None:
                                 artifact_map[str(pr_data['issue_id'])] = False
                             st.session_state['survey_responses']['artifact_upload_complete'] = False
+                            
+                            # Clear post-PR-review responses from previous PR to prevent carryover
+                            # BUG FIX: Streamlit caches widget values by their `key` parameter.
+                            # The `value` param only sets the initial value on first render;
+                            # afterwards, the cached widget state takes precedence. This caused
+                            # responses from the first PR to appear pre-filled for all subsequent PRs.
+                            # 
+                            # Affected fields in reviewer-post-pr-review table:
+                            #   - nasa_tlx_* (all NASA TLX questions)
+                            #   - code_quality_* (all code quality questions)
+                            #   - ai_likelihood, ai_reasoning, ai_review_strategy
+                            st.session_state['survey_responses']['nasa_tlx_responses'] = {}
+                            st.session_state['survey_responses']['code_quality_responses'] = {}
+                            st.session_state['survey_responses']['ai_likelihood'] = None
+                            st.session_state['survey_responses']['ai_reasoning'] = ''
+                            st.session_state['survey_responses']['ai_review_strategy'] = ''
+                            st.session_state['survey_responses']['is_reviewed'] = None
+                            st.session_state['survey_responses']['artifacts_uploaded'] = False
+                            
+                            # CRITICAL: Clear all Streamlit widget keys for post-PR-review questions.
+                            # Without this, widgets ignore the `value` param and show cached values.
+                            widget_keys_to_clear = [
+                                # AI detection text areas
+                                'ai_review_strategy_text', 'ai_reasoning_text',
+                                # AI likelihood slider
+                                'ai_likelihood',
+                                # NASA TLX sliders
+                                'nasa_tlx_mental_demand', 'nasa_tlx_physical_demand', 'nasa_tlx_frustration',
+                                # Code quality sliders
+                                'code_quality_readability', 'code_quality_analyzability',
+                                'code_quality_modifiability', 'code_quality_testability',
+                                'code_quality_stability', 'code_quality_correctness',
+                                'code_quality_compliance',
+                            ]
+                            for widget_key in widget_keys_to_clear:
+                                if widget_key in st.session_state:
+                                    del st.session_state[widget_key]
+                            
                             # Send the reviewer back to the estimate + assignment step for the new PR
                             st.session_state['page'] = 3  # pr_assignment_page
                             st.rerun()
