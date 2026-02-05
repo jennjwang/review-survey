@@ -277,7 +277,7 @@ def pr_status_page():
         st.divider()
         st.subheader("Upload Screen Recorder Data")
         st.write("Please review your data to exclude any sensitive information before submitting.")
-        st.info("**Large files (>1GB):** If your recording is too large, please use **[this Google Form](https://forms.gle/Yk5TcwhEveMNCF1g8)** instead.")
+        st.warning("**Large files (>1GB):** If your recording is too large, please use **[this Google Form](https://forms.gle/Yk5TcwhEveMNCF1g8)** instead.")
 
         st.caption("Upload a zipped copy of the `/data` folder from your swe-prod-recorder directory for this PR review.")
         screenrec_upload = st.file_uploader(
