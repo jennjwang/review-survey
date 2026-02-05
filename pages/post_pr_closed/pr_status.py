@@ -306,7 +306,7 @@ def pr_status_page():
             MAX_FILE_SIZE_GB = 1
             MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_GB * 1024 * 1024 * 1024
             if screenrec_upload.size > MAX_FILE_SIZE_BYTES:
-                st.error(f"File size exceeds {MAX_FILE_SIZE_GB}GB limit. Please reduce the file size and try again.")
+                st.error(f"File size exceeds {MAX_FILE_SIZE_GB}GB limit. Please upload the data via Google Form instead.")
                 return
 
             # Upload file to Drive
