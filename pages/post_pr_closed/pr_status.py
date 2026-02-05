@@ -277,6 +277,7 @@ def pr_status_page():
         st.divider()
         st.subheader("Upload Screen Recorder Data")
         st.write("Please review your data to exclude any sensitive information before submitting.")
+        st.info("**Large files (>1GB):** If your recording is too large, please use **[this Google Form](https://forms.gle/Yk5TcwhEveMNCF1g8)** instead.")
 
         st.caption("Upload a zipped copy of the `/data` folder from your swe-prod-recorder directory for this PR review.")
         screenrec_upload = st.file_uploader(
@@ -299,6 +300,13 @@ def pr_status_page():
             # Enforce upload present
             if not screenrec_upload:
                 st.error("Please upload the screen recorder data zip before submitting.")
+                return
+            
+            # Check file size (1GB limit)
+            MAX_FILE_SIZE_GB = 1
+            MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_GB * 1024 * 1024 * 1024
+            if screenrec_upload.size > MAX_FILE_SIZE_BYTES:
+                st.error(f"File size exceeds {MAX_FILE_SIZE_GB}GB limit. Please reduce the file size and try again.")
                 return
 
             # Upload file to Drive
