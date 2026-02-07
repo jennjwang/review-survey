@@ -302,11 +302,11 @@ def pr_status_page():
                 st.error("Please upload the screen recorder data zip before submitting.")
                 return
             
-            # Check file size (1GB limit)
-            MAX_FILE_SIZE_GB = 1
-            MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_GB * 1024 * 1024 * 1024
+            # Check file size (500MB limit)
+            MAX_FILE_SIZE_MB = 500
+            MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
             if screenrec_upload.size > MAX_FILE_SIZE_BYTES:
-                st.error(f"File size exceeds {MAX_FILE_SIZE_GB}GB limit. Please upload the data via Google Form instead.")
+                st.error(f"File size exceeds {MAX_FILE_SIZE_MB}MB limit. Please upload the data via Google Form instead.")
                 return
 
             # Upload file to Drive
