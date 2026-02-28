@@ -84,7 +84,7 @@ def review_submission_page():
         st.divider()
         st.subheader("Upload Screen Recorder Data")
         st.write("Please review your data to exclude any sensitive information before submitting.")
-        st.warning("**Large files (>1GB):** If your recording is too large, please use **[this Google Form](https://forms.gle/Yk5TcwhEveMNCF1g8)** instead.")
+        st.warning("**Large files (>500MB):** If your recording is too large, please use **[this Google Form](https://forms.gle/Yk5TcwhEveMNCF1g8)** instead.")
 
         st.caption("Upload a zipped copy of the `/data` folder from your swe-prod-recorder directory.")
         screenrec_upload = st.file_uploader(
@@ -96,55 +96,50 @@ def review_submission_page():
         st.markdown("<div style='margin-bottom: 1rem;'></div>", unsafe_allow_html=True)
 
         submit_button = st.button(
-            "Submit and Continue",
+            "Continue",
             key="submit_review_completion",
             type="primary"
         )
 
         if submit_button:
-            # Enforce upload present
-            if not screenrec_upload:
-                st.error("Please upload the screen recorder data zip before submitting.")
-                return
-            
-            # Check file size (500MB limit)
-            MAX_FILE_SIZE_MB = 500
-            MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
-            if screenrec_upload.size > MAX_FILE_SIZE_BYTES:
-                st.error(f"File size exceeds {MAX_FILE_SIZE_MB}MB limit. Please upload the data via Google Form instead.")
-                return
-
-            # Upload files to Drive
-            try:
-                folder_id = (
-                    st.secrets.get('REVIEWER_GDRIVE_FOLDER_ID') or
-                    st.secrets.get('GDRIVE_FOLDER_ID')
-                )
-                if not folder_id:
-                    st.error("Drive folder not configured. Ask the study team to set REVIEWER_GDRIVE_FOLDER_ID in secrets.")
+            # Upload to Drive if file provided (optional)
+            if screenrec_upload:
+                # Check file size (500MB limit)
+                MAX_FILE_SIZE_MB = 500
+                MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
+                if screenrec_upload.size > MAX_FILE_SIZE_BYTES:
+                    st.error(f"File size exceeds {MAX_FILE_SIZE_MB}MB limit. Please upload the data via Google Form instead.")
                     return
 
-                with st.spinner('Uploading your file...'):
-                    participant_folder = sanitize_filename(participant_id) if participant_id else "unknown_participant"
-                    issue_folder = sanitize_filename(f"pr_{issue_id}") if issue_id else "unknown_pr"
-                    review_status = "initial_review"
-                    subfolders = [participant_folder, issue_folder, review_status]
-
-                    # Upload screen recorder zip
-                    upload_to_drive_in_subfolders(
-                        screenrec_upload,
-                        folder_id,
-                        subfolders=subfolders,
-                        filename=screenrec_upload.name,
+                try:
+                    folder_id = (
+                        st.secrets.get('REVIEWER_GDRIVE_FOLDER_ID') or
+                        st.secrets.get('GDRIVE_FOLDER_ID')
                     )
-                st.success("Upload completed successfully!")
-            except Exception as e:
-                st.error(f"Upload failed: {e}")
-                return
+                    if not folder_id:
+                        st.error("Drive folder not configured. Ask the study team to set REVIEWER_GDRIVE_FOLDER_ID in secrets.")
+                        return
+
+                    with st.spinner('Uploading your file...'):
+                        participant_folder = sanitize_filename(participant_id) if participant_id else "unknown_participant"
+                        issue_folder = sanitize_filename(f"pr_{issue_id}") if issue_id else "unknown_pr"
+                        review_status = "initial_review"
+                        subfolders = [participant_folder, issue_folder, review_status]
+
+                        upload_to_drive_in_subfolders(
+                            screenrec_upload,
+                            folder_id,
+                            subfolders=subfolders,
+                            filename=screenrec_upload.name,
+                        )
+                    st.success("Upload completed successfully!")
+                except Exception as e:
+                    st.error(f"Upload failed: {e}")
+                    return
 
             # Save response
             st.session_state['survey_responses']['is_reviewed'] = "Yes - I've submitted my review"
-            st.session_state['survey_responses']['artifacts_uploaded'] = True
+            st.session_state['survey_responses']['artifacts_uploaded'] = bool(screenrec_upload)
 
             # Update is_reviewed flag in database
             print(f"[DEBUG] Updating is_reviewed for issue_id={issue_id}")
