@@ -390,6 +390,26 @@ def save_post_pr_closed_responses(participant_id: str, pr_url: str, responses: d
         }
 
 
+def get_completed_pr_closed_surveys(participant_id: str):
+    """
+    Get PR URLs for which the reviewer has completed the post-PR-closed survey.
+
+    Returns:
+        set of pr_url strings with completed surveys
+    """
+    if not supabase_client:
+        return set()
+    try:
+        result = supabase_client.table('reviewer-post-pr-closed')\
+            .select('pr_url')\
+            .eq('participant_id', participant_id)\
+            .execute()
+        return {row['pr_url'] for row in result.data} if result.data else set()
+    except Exception as e:
+        print(f"Error fetching completed pr-closed surveys: {e}")
+        return set()
+
+
 def save_end_study_responses(participant_id: str, responses: dict):
     """
     Save end-of-study responses to Supabase reviewer-end-study table.

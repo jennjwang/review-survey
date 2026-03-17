@@ -13,6 +13,7 @@ from survey_data import (
     assign_pr_to_reviewer,
     get_participant_progress,
     get_prs_with_incomplete_responses,
+    get_completed_pr_closed_surveys,
     MIN_COMPLETED_REVIEWS
 )
 from drive_upload import upload_to_drive_in_subfolders, sanitize_filename
@@ -129,10 +130,13 @@ def pr_status_page():
     if participant_id and assigned_repo:
         assigned = list_assigned_prs_for_reviewer(participant_id, assigned_repo)
         if assigned['success'] and assigned['prs']:
-            pr_choices = [
-                pr for pr in assigned['prs']
-                if not pr.get('is_closed') and not pr.get('is_merged')
-            ]
+            completed_pr_closed_urls = get_completed_pr_closed_surveys(participant_id)
+            for pr in assigned['prs']:
+                is_done = pr.get('is_closed') or pr.get('is_merged')
+                if not is_done:
+                    pr_choices.append(pr)
+                elif pr.get('url') not in completed_pr_closed_urls:
+                    pr_choices.append(pr)
 
     def request_another_pr(button_key: str):
         if participant_id and assigned_repo:
