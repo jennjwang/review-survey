@@ -246,6 +246,19 @@ def pr_status_page():
         issue_key = pr_url or 'current_pr'
     st.session_state['survey_responses']['artifact_upload_complete'] = artifact_map.get(issue_key, False)
 
+    # Derive the current PR status from the database fields
+    if pr.get('is_merged'):
+        print(f"[DEBUG] PR is merged: {pr.get('is_merged')}")
+        db_status = "Merged - PR was accepted and merged"
+    elif pr.get('is_closed'):
+        print(f"[DEBUG] PR is closed: {pr.get('is_closed')}")
+        db_status = "Closed without merging - PR was rejected or abandoned"
+    else:
+        db_status = "Still open - review in progress"
+    st.session_state['survey_responses']['pr_status'] = db_status
+    # Also update the widget key directly so Streamlit's cached widget state reflects the DB
+    st.session_state['pr_status'] = db_status
+
     if pr_url:
         st.info(f"**Link to PR:** [{pr_url}]({pr_url})")
     else:
@@ -253,17 +266,10 @@ def pr_status_page():
 
     st.markdown("<div style='margin: 1.5rem 0;'></div>", unsafe_allow_html=True)
 
-    # Set default PR status if not already set
-    if 'pr_status' not in st.session_state['survey_responses']:
-        st.session_state['survey_responses']['pr_status'] = 'Still open - review in progress'
-
-    previous_value = st.session_state['survey_responses']['pr_status']
-
     pr_status = selectbox_question(
         "What is the current status of this PR?",
         STATUS_OPTIONS,
         "pr_status",
-        previous_value
     )
 
     st.markdown("<div style='margin-top: 1rem;'></div>", unsafe_allow_html=True)
