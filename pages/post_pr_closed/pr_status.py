@@ -255,9 +255,12 @@ def pr_status_page():
         db_status = "Closed without merging - PR was rejected or abandoned"
     else:
         db_status = "Still open - review in progress"
-    st.session_state['survey_responses']['pr_status'] = db_status
-    # Also update the widget key directly so Streamlit's cached widget state reflects the DB
-    st.session_state['pr_status'] = db_status
+    # Pre-populate from backend only on first load or when switching to a different PR
+    current_issue_key = pr.get('issue_id') or pr_url
+    if st.session_state.get('_pr_status_loaded_for') != current_issue_key:
+        st.session_state['survey_responses']['pr_status'] = db_status
+        st.session_state['pr_status'] = db_status
+        st.session_state['_pr_status_loaded_for'] = current_issue_key
 
     if pr_url:
         st.info(f"**Link to PR:** [{pr_url}]({pr_url})")
