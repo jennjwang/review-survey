@@ -132,6 +132,8 @@ def pr_status_page():
         if assigned['success'] and assigned['prs']:
             completed_pr_closed_urls = get_completed_pr_closed_surveys(participant_id)
             for pr in assigned['prs']:
+                if not pr.get('is_reviewed'):
+                    continue
                 is_done = pr.get('is_closed') or pr.get('is_merged')
                 if not is_done:
                     pr_choices.append(pr)
