@@ -1220,8 +1220,24 @@ def determine_current_page(participant_id: str, survey_responses: dict = None):
         closed_pr_reviews = progress.get('post_pr_closed_count', 0)
         post_pr_review_entries = progress.get('post_pr_review_data') or []
         current_pr_url = pr_data.get('url')
+
+        # Check if EVERY reviewed+closed PR has a post-pr-closed survey (per-PR URL match,
+        # not just a count comparison, to catch gaps when extra PRs were assigned).
+        _norm_url = lambda u: (u or '').strip().rstrip('/')
+        _closed_survey_urls = {_norm_url(u) for u in get_completed_pr_closed_surveys(participant_id)}
+        _assigned_all = list_assigned_prs_for_reviewer(participant_id, assigned_repo)
+        _all_assigned_prs = _assigned_all.get('prs', []) if _assigned_all.get('success') else []
+        _reviewed_closed_prs = [
+            pr for pr in _all_assigned_prs
+            if pr.get('is_reviewed') and (pr.get('is_closed') or pr.get('is_merged'))
+        ]
         all_reviewed_prs_closed = (
-            closed_pr_reviews >= completed_pr_reviews and completed_pr_reviews > 0
+            len(_reviewed_closed_prs) > 0 and
+            all(_norm_url(pr.get('url', '')) in _closed_survey_urls for pr in _reviewed_closed_prs)
+        )
+        print(
+            f"[DEBUG] all_reviewed_prs_closed={all_reviewed_prs_closed} "
+            f"({len(_closed_survey_urls)} closed surveys / {len(_reviewed_closed_prs)} reviewed+closed PRs)"
         )
 
         def normalize_url(url: str) -> str:
@@ -1323,8 +1339,8 @@ def determine_current_page(participant_id: str, survey_responses: dict = None):
                 print(f"[DEBUG] Awaiting artifact uploads for issue_key={issue_key}.")
                 return 11
             if not progress.get('end_study_completed'):
-                return 12  # Go directly to study validation
-            return 13  # Completion page once validation done
+                return 11  # Go to study validation
+            return 12  # Completion page once validation done
 
         # After post-PR review questions, go to PR status page
         # Check if PR is closed/merged
@@ -1348,15 +1364,15 @@ def determine_current_page(participant_id: str, survey_responses: dict = None):
 
         # Check end-study completion
         if not progress.get('end_study_completed'):
-            return 12  # Post-PR closed complete, go to study validation
+            return 11  # Post-PR closed complete, go to study validation
 
-        if closed_pr_reviews < completed_pr_reviews:
+        if not all_reviewed_prs_closed:
             print(
-                f"[DEBUG] Cannot finish - pending PR closures ({closed_pr_reviews}/{completed_pr_reviews}). Redirecting to PR status page."
+                f"[DEBUG] Cannot finish - pending PR closed surveys. Redirecting to PR status page."
             )
             return 8
 
-        return 13  # Go to completion page
+        return 12  # Go to completion page
 
     except Exception as e:
         print(f"Error determining current page: {e}")

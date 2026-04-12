@@ -6,7 +6,10 @@ Asks about how the study workflow compared to normal work.
 import streamlit as st
 from survey_components import page_header, navigation_buttons
 from survey_utils import save_and_navigate, record_audio
-from survey_data import save_end_study_responses, get_participant_progress, MIN_COMPLETED_REVIEWS
+from survey_data import (
+    save_end_study_responses, get_participant_progress, MIN_COMPLETED_REVIEWS,
+    get_completed_pr_closed_surveys, list_assigned_prs_for_reviewer, get_repository_assignment,
+)
 
 
 def study_validation_page():
@@ -22,6 +25,38 @@ def study_validation_page():
             "Please complete and close the minimum number of PR reviews before reflecting on the overall study. Redirecting to PR Status."
         )
         st.session_state['page'] = 8
+        st.rerun()
+        return
+
+    # Block if any reviewed+closed PR is still missing a post-pr-closed survey
+    if participant_id:
+        assigned_repo = st.session_state['survey_responses'].get('assigned_repository')
+        if not assigned_repo:
+            repo_result = get_repository_assignment(participant_id)
+            if repo_result['success']:
+                assigned_repo = repo_result['repository']
+        if assigned_repo:
+            _norm = lambda u: (u or '').strip().rstrip('/')
+            closed_survey_urls = {_norm(u) for u in get_completed_pr_closed_surveys(participant_id)}
+            assigned_result = list_assigned_prs_for_reviewer(participant_id, assigned_repo)
+            all_prs = assigned_result.get('prs', []) if assigned_result.get('success') else []
+            pending = [
+                pr for pr in all_prs
+                if pr.get('is_reviewed') and (pr.get('is_closed') or pr.get('is_merged'))
+                and _norm(pr.get('url', '')) not in closed_survey_urls
+            ]
+            if pending:
+                st.warning(
+                    f"You have {len(pending)} closed PR(s) with missing survey responses. "
+                    "Please complete them before finishing the study. Redirecting to PR Status."
+                )
+                st.session_state['page'] = 8
+                st.rerun()
+                return
+
+    # If end-of-study was already submitted, skip directly to completion
+    if progress.get('end_study_completed'):
+        st.session_state['page'] = 12
         st.rerun()
         return
 
